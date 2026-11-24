@@ -14,3 +14,5 @@ User reports a 40 °C minimum heating setpoint on the Buderus Logamax U072-12K f
 
 ## Upper heating setpoint limit
 Provisional active CH setpoint range: 40–82 °C. The configured user maximum may be lower but must not be below 40 °C or above 82 °C. This is a software policy pending physical OpenTherm validation, not a verified protocol limit. No demand means CH off. DHW and boiler protections remain separate.
+
+2026-11-25: HeatingLimits integrated into ReserveControl and RecoveryRamp; seven host test programs passed C++17 strict warnings and nonrecovering UBSan. Provisional 40–82 C limits; no hardware actuation or CI.
