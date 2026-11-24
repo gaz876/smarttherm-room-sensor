@@ -11,3 +11,6 @@ RecoveryRamp and test_ramp.cpp published; exact Git blob hashes matched host cop
 
 ## Buderus minimum heating setpoint
 User reports a 40 °C minimum heating setpoint on the Buderus Logamax U072-12K front panel. OpenTherm minimum is not yet verified. Pending hardware validation, enforce 40 °C as the minimum active CH setpoint for reserve, PID, weather compensation and recovery. No heat demand means CH request off, not continuous heating at 40 °C. This requirement is documented, not yet implemented.
+
+## Upper heating setpoint limit
+Provisional active CH setpoint range: 40–82 °C. The configured user maximum may be lower but must not be below 40 °C or above 82 °C. This is a software policy pending physical OpenTherm validation, not a verified protocol limit. No demand means CH off. DHW and boiler protections remain separate.
