@@ -8,3 +8,6 @@ Current update: WiredSensors and bounded ReserveControl prototypes are published
 HeatingControl integration published. Host GCC 14.2 C++17 strict warnings and UBSan integration test passed. NORMAL intentionally blocked pending PID recovery. No actuation.
 
 RecoveryRamp and test_ramp.cpp published; exact Git blob hashes matched host copies. GCC 14.2 C++17 strict warnings and nonrecovering UBSan test passed. PID handoff remains blocked.
+
+## Buderus minimum heating setpoint
+User reports a 40 °C minimum heating setpoint on the Buderus Logamax U072-12K front panel. OpenTherm minimum is not yet verified. Pending hardware validation, enforce 40 °C as the minimum active CH setpoint for reserve, PID, weather compensation and recovery. No heat demand means CH request off, not continuous heating at 40 °C. This requirement is documented, not yet implemented.
