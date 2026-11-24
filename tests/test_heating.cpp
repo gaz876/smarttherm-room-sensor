@@ -3,7 +3,7 @@
 #include <iostream>
 int main() {
  HeatingControl h;
- auto run=[&](uint32_t now,bool heat=true,bool pid=true,bool ot=true,bool wired=true,bool weather=false){return h.update(now,heat,pid,ot,{45,now,wired,true},{35,now,true,true},{0,100,1000},{30,60,45},weather,55,true,40);};
+ auto run=[&](uint32_t now,bool heat=true,bool pid=true,bool ot=true,bool wired=true,bool weather=false){return h.update(now,heat,pid,ot,{45,now,wired,true},{35,now,true,true},{0,100,1000},{40,60,45},weather,55,true,40);};
  auto d=run(0); assert(d.mode==SafetyControl::RESERVE && d.reserve.mode==ReserveMode::WiredHold && d.reserve.target==40 && d.wired.delta==10);
  assert(run(0,true,true,true,false).reserve.mode==ReserveMode::Fixed);
  assert(run(0,true,true,true,false,true).reserve.mode==ReserveMode::Weather);
