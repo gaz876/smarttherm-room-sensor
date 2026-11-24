@@ -14,3 +14,5 @@ Host test: `g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc test
 - Negative delta-T alone is not a sensor fault.
 - Flame modulation and cycling are diagnostic only; never use them directly to select the reserve setpoint.
 - Compare boiler supply telemetry with wired supply for diagnostics when supported.
+
+Integrate WiredSensors validity with ReserveControl; implement recovery and authenticated freshness. Adaptive correction requires physical validation.
