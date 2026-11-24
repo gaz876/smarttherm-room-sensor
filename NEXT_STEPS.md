@@ -18,3 +18,5 @@ Host test: `g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc test
 Integrate WiredSensors validity with ReserveControl; implement recovery and authenticated freshness. Adaptive correction requires physical validation.
 
 Next: implement verified PID recovery and transport freshness; adaptive wired control remains unvalidated. Integration test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc tests/test_heating.cpp -o /tmp/test_heating && /tmp/test_heating.
+
+Integrate recovery ramp with verified PID initialization and handoff; keep NORMAL blocked until validated. Test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc tests/test_ramp.cpp -o /tmp/test_ramp && /tmp/test_ramp.
