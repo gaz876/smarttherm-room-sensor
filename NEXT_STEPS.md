@@ -29,3 +29,5 @@ Integrate recovery ramp with verified PID initialization and handoff; keep NORMA
 
 ## Upper limit requirement
 Enforce 40–82 °C active CH range in all control paths, with a configurable lower user ceiling within that range. Reject incompatible configuration; validate final command before OpenTherm transmission. Test both boundaries, out-of-range requests and no-demand behavior. Verify physical boiler and OpenTherm limits before production deployment.
+
+Next: final OpenTherm command gate, PID tracking and authenticated freshness. Physical validation remains mandatory.
