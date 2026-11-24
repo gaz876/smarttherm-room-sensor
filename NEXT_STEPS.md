@@ -20,3 +20,9 @@ Integrate WiredSensors validity with ReserveControl; implement recovery and auth
 Next: implement verified PID recovery and transport freshness; adaptive wired control remains unvalidated. Integration test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc tests/test_heating.cpp -o /tmp/test_heating && /tmp/test_heating.
 
 Integrate recovery ramp with verified PID initialization and handoff; keep NORMAL blocked until validated. Test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc tests/test_ramp.cpp -o /tmp/test_ramp && /tmp/test_ramp.
+
+## Mandatory heating setpoint constraint
+- Enforce a provisional 40 °C minimum active CH setpoint across reserve, PID, weather compensation and recovery; validate upper limit and reject incompatible configuration.
+- Keep CH disabled when no heat demand; preserve DHW and boiler protections.
+- Revise synthetic tests and models that use active setpoints below 40 °C. Verify boundary and handoff behavior.
+- Verify actual OpenTherm accepted minimum on the physical Buderus Logamax U072-12K before revising the provisional floor.
