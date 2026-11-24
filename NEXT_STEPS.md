@@ -26,3 +26,6 @@ Integrate recovery ramp with verified PID initialization and handoff; keep NORMA
 - Keep CH disabled when no heat demand; preserve DHW and boiler protections.
 - Revise synthetic tests and models that use active setpoints below 40 °C. Verify boundary and handoff behavior.
 - Verify actual OpenTherm accepted minimum on the physical Buderus Logamax U072-12K before revising the provisional floor.
+
+## Upper limit requirement
+Enforce 40–82 °C active CH range in all control paths, with a configurable lower user ceiling within that range. Reject incompatible configuration; validate final command before OpenTherm transmission. Test both boundaries, out-of-range requests and no-demand behavior. Verify physical boiler and OpenTherm limits before production deployment.
