@@ -8,3 +8,9 @@ Host test: `g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc test
 - Start from the last valid bounded heating setpoint; use a configured fixed fallback if unavailable or wired sensors fail.
 - Do not infer room temperature or heat demand from delta-T alone. Adaptive coefficients and limits require bench validation; no automatic adaptive actuation is approved yet.
 - Preserve boiler protections and DHW behavior. No relay switching for room sensor loss.
+
+## Wired sensor validation
+- Validate DS18B20 CRC, conversion completion, measurement age and configured physical limits before computing delta-T.
+- Negative delta-T alone is not a sensor fault.
+- Flame modulation and cycling are diagnostic only; never use them directly to select the reserve setpoint.
+- Compare boiler supply telemetry with wired supply for diagnostics when supported.
