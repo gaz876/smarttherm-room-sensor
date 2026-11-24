@@ -9,15 +9,15 @@ uint8_t sht40_crc(uint8_t a, uint8_t b) {
     }
     return crc;
 }
-bool sht40_decode(const uint8_t *f,size_t len,double dt,double dh,uint64_t now,sht40_sample *out) {
+bool sht40_decode(const uint8_t *f,size_t len,double dt,uint64_t now,sht40_sample *out) {
     if (!out) return false;
     *out=(sht40_sample){0};
-    if (!f || len!=6 || !isfinite(dt) || !isfinite(dh) || fabs(dt)>10 || fabs(dh)>30) return false;
+    if (!f || len!=6 || !isfinite(dt) || fabs(dt)>10) return false;
     if (sht40_crc(f[0],f[1])!=f[2] || sht40_crc(f[3],f[4])!=f[5]) return false;
     double t=-45.0+175.0*(256u*f[0]+f[1])/65535.0;
     double h=-6.0+125.0*(256u*f[3]+f[4])/65535.0;
     if (t< -40 || t>125 || t+dt< -40 || t+dt>125) return false;
-    h=fmin(100,fmax(0,h)); h=fmin(100,fmax(0,h+dh));
+    h=fmin(100,fmax(0,h));
     *out=(sht40_sample){t+dt,h,now,true};
     return true;
 }

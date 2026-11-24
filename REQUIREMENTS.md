@@ -3,7 +3,7 @@
 Experimental standalone ESP32-C3 / SHT40 firmware. Not ready for heating control.
 
 ## Requirements
-- Temperature and humidity; configurable sampling (default 10 s), calibration, CRC validation and explicit invalid/stale state.
+- Temperature and humidity; configurable sampling (default 10 s), temperature-only correction, factory-calibrated humidity without user offset, CRC validation and explicit invalid/stale state.
 - Wi-Fi 2.4 GHz; protected initial phone setup, persistent configuration, indefinite reconnect with backoff, manual BOOT setup, no automatic AP on connection loss; DHCP or static IP.
 - Local MQTT broker and external broker client modes; configurable topics, indoor/outdoor sources, multiple sensors and reconnect. Verify SmartTherm protocol compatibility before implementation.
 - Russian responsive web UI: measurements, age, IP, RSSI, clients, sensor status, firmware, heap, uptime and reset reason; authenticated reboot and factory reset with confirmation.
