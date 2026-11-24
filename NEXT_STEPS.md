@@ -16,3 +16,5 @@ Host test: `g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc test
 - Compare boiler supply telemetry with wired supply for diagnostics when supported.
 
 Integrate WiredSensors validity with ReserveControl; implement recovery and authenticated freshness. Adaptive correction requires physical validation.
+
+Next: implement verified PID recovery and transport freshness; adaptive wired control remains unvalidated. Integration test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc tests/test_heating.cpp -o /tmp/test_heating && /tmp/test_heating.
