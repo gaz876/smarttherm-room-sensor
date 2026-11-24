@@ -6,3 +6,5 @@ Reserve sensor validation requirements documented. Adaptive control and hardware
 Current update: WiredSensors and bounded ReserveControl prototypes are published. ReserveControl host tests passed (six assertions, C++17, strict warnings, UBSan). Adaptive adjustment and integration remain pending.
 
 HeatingControl integration published. Host GCC 14.2 C++17 strict warnings and UBSan integration test passed. NORMAL intentionally blocked pending PID recovery. No actuation.
+
+RecoveryRamp and test_ramp.cpp published; exact Git blob hashes matched host copies. GCC 14.2 C++17 strict warnings and nonrecovering UBSan test passed. PID handoff remains blocked.
