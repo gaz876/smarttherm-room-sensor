@@ -1,5 +1,8 @@
 # Current state — 2026-11-25
 
+2026-11-25: Current ceiling is 80 °C for active CH setpoints (40 °C floor; narrower valid configuration allowed). Supersedes historical 82 °C decision. Actual OT range and hardware remain unverified. PR 6 merged at 11f8fdc82d1a240e14a939f0f26618c6e8b8d3d9; tested source 83f71e796a13b4b1b9712dc5d718ae602a4c8f8c; CI workflow 00b7ce1f6a2f185958a61e06c512f85b7b35a236, run 45539130805, job 138953026312, PASS 9/9, GCC 13.3.0, Ubuntu 24.04.5, UBSan, Metadata read only. Full job log inspected. No production or hardware changes. Secret settings confirmed unchanged by owner; API inspection unavailable. Next: private PID handoff and MQTT/OT integration review.
+
+
 Goal: prepare experimental extensions for original SmartTherm 0.8.4.16 with a wireless room sensor; preserve original PID, DHW and boiler protections. No original firmware modification or hardware deployment yet.
 
 Target architecture: SHT40 → MQTT → freshness/validity checks → original PID or bounded reserve → recovery ramp/PID handoff → OpenTherm command guard. Integration is pending.
@@ -9,7 +12,7 @@ Target architecture: SHT40 → MQTT → freshness/validity checks → original P
 | SafetyControl | Age, sequence, session and mode checks; authenticated transport pending |
 | WiredSensors | CRC, conversion, age and physical bounds |
 | ReserveControl | Weather target, last valid target or fixed fallback; adaptive reserve pending |
-| HeatingLimits | Provisional active CH 40–82 °C; actual OT limits pending |
+| HeatingLimits | Provisional active CH 40–80 °C; actual OT limits pending |
 | RecoveryRamp | Bounded slew |
 | RecoveryAdapter | Cancellation and preparation flag; actual PID initialization pending |
 | HeatingControl | Combined prototype; NORMAL intentionally blocked |
@@ -28,7 +31,7 @@ As of 2026-11-25. Standalone experimental C++17 prototype, not production firmwa
 - SafetyControl: mode transitions, sample age, sequence and session checks; authenticated transport freshness is assumed, not implemented.
 - WiredSensors: CRC and conversion flags, age, physical bounds and supply/return delta.
 - ReserveControl: weather target, previous target hold with valid wired readings, fixed fallback.
-- HeatingLimits: provisional active CH range 40–82 °C, configurable narrower range.
+- HeatingLimits: provisional active CH range 40–80 °C, configurable narrower range.
 - RecoveryRamp: standalone bounded slew limiter.
 - HeatingControl: combines safety, wired validation and reserve selection. NORMAL intentionally blocked pending PID handoff.
 

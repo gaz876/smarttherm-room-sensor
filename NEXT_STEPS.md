@@ -1,10 +1,13 @@
 # Current next steps — 2026-11-25
 
+2026-11-25: Current ceiling is 80 °C for active CH setpoints (40 °C floor; narrower valid configuration allowed). Supersedes historical 82 °C decision. Actual OT range and hardware remain unverified. PR 6 merged at 11f8fdc82d1a240e14a939f0f26618c6e8b8d3d9; tested source 83f71e796a13b4b1b9712dc5d718ae602a4c8f8c; CI workflow 00b7ce1f6a2f185958a61e06c512f85b7b35a236, run 45539130805, job 138953026312, PASS 9/9, GCC 13.3.0, Ubuntu 24.04.5, UBSan, Metadata read only. Full job log inspected. No production or hardware changes. Secret settings confirmed unchanged by owner; API inspection unavailable. Next: private PID handoff and MQTT/OT integration review.
+
+
 1. Review original SmartTherm 0.8.4.16 PID state, integral, derivative history and timing; design and test bumpless recovery. Keep NORMAL blocked until validated.
 2. Implement authenticated freshness/replay protection across restarts and adaptive reserve using valid wired trends; delta-T alone is not room demand.
 3. Integrate guard with actual command path, never send zero sentinel as active target; preserve CH off, DHW and boiler protections.
 4. Develop room sensor in dev: ESP-IDF target build, Wi-Fi, MQTT authorization, freshness, exact topics and full firmware.
-5. Review integration with original firmware; verify actual OT limits and hardware on bench before any deployment. Provisional 40–82 °C is not a verified OT range.
+5. Review integration with original firmware; verify actual OT limits and hardware on bench before any deployment. Provisional 40–80 °C is not a verified OT range.
 6. Use GitHub for feasible work, pinned audited CI, synchronize journals public → private after each checkpoint. No paid resources or production deployment without approval.
 
 Completed: standalone guard and nine-program CI (run 45531837467). Historical tasks below are not active instructions.
@@ -24,7 +27,7 @@ Completed: standalone guard and nine-program CI (run 45531837467). Historical ta
 - Implement authenticated transport freshness across restarts and replay protection.
 - Develop reserve adjustment using wired supply/return readings and trends. Start from last valid bounded target; use fixed fallback if unavailable or wired readings fail. Delta-T alone cannot establish room temperature or demand. Negative delta-T alone is not a fault. Flame modulation and cycling are diagnostic only. Compare boiler and wired supply telemetry when supported.
 - Preserve original PID and weather compensation, DHW behavior and boiler protections. No relay switching for room sensor loss.
-- Integrate with original SmartTherm 0.8.4.16 only after source review; validate actual OpenTherm limits on Buderus U072-12K. Provisional active CH range 40–82 °C; user maximum may be lower within this range.
+- Integrate with original SmartTherm 0.8.4.16 only after source review; validate actual OpenTherm limits on Buderus U072-12K. Provisional active CH range 40–80 °C; user maximum may be lower within this range.
 - Bench validation before production or adaptive actuation. Audit CI separately before enabling workflows.
 
 ## Host test command
