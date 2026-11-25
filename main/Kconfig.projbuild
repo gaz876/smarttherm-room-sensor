@@ -4,11 +4,11 @@ config ROOM_SAMPLE_INTERVAL_S
     range 1 3600
     default 10
 config ROOM_I2C_SDA
-    int "SDA GPIO (verify actual board)"
-    range 0 21
+    int "SDA GPIO (fixed provisional SuperMini profile)"
+    range 4 4
     default 4
 config ROOM_I2C_SCL
-    int "SCL GPIO (verify actual board)"
-    range 0 21
+    int "SCL GPIO (fixed provisional SuperMini profile)"
+    range 5 5
     default 5
 endmenu
