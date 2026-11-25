@@ -1,0 +1,14 @@
+name: Runner Test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Check runner
+        run: echo "RUNNER_OK"
