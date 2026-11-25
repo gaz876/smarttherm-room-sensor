@@ -48,7 +48,7 @@ jobs:
             cmake --version
             ninja --version
             mkdir /tmp/room_sensor
-            cp -a /input/. /tmp/room_sensor/
+            cp -R --no-preserve=ownership /input/. /tmp/room_sensor/
             cd /tmp/room_sensor
             idf.py set-target esp32c3
             idf.py build
