@@ -1,5 +1,8 @@
 # Current checkpoint — 2026-11-25
 
+2026-11-25: Current ceiling is 80 °C for active CH setpoints (40 °C floor; narrower valid configuration allowed). Supersedes historical 82 °C decision. Actual OT range and hardware remain unverified. PR 6 merged at 11f8fdc82d1a240e14a939f0f26618c6e8b8d3d9; tested source 83f71e796a13b4b1b9712dc5d718ae602a4c8f8c; CI workflow 00b7ce1f6a2f185958a61e06c512f85b7b35a236, run 45539130805, job 138953026312, PASS 9/9, GCC 13.3.0, Ubuntu 24.04.5, UBSan, Metadata read only. Full job log inspected. No production or hardware changes. Secret settings confirmed unchanged by owner; API inspection unavailable. Next: private PID handoff and MQTT/OT integration review.
+
+
 PR 3 merged into experimental safety-control at 932677fe9c1a8330c1708bb874213eac7009c913; PR 4 enabled automatic pinned-source CI on main workflow changes. Run 45531837467 PASS 9/9, full logs inspected, Metadata read only, zero artifacts, no apparent secret leakage. GitHub-first policy applies; no production changes. Earlier local test claims are superseded by verified CI. Historical entries below are retained, not current status.
 
 ---
