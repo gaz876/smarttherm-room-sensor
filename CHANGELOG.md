@@ -1,3 +1,9 @@
+# ESP32-C3 CI input-copy fix — 2026-11-25
+
+Inspected failed run 45630874212, reproduced ownership error locally and verified replacement copy command. Merged one-line CI fix PR #9 without reducing isolation. New run 45632347131 queued; target success pending.
+
+---
+
 # Isolated ESP32-C3 CI — 2026-11-25
 
 Created and merged standalone pinned-image target build workflow via public PR #8. Actual first Actions run 45630874212 started, result pending. No firmware code change, artifact publication, paid runner or deployment.
