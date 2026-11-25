@@ -1,3 +1,9 @@
+# Provisional SuperMini GPIO profile and artifact CI preparation — 2026-11-26
+
+GPIO mapping restricted to SDA4/SCL5; two actual host GPIO runs and 14 static-assert compilation cases passed. Artifact candidate now pins new source and verifies copied binary hashes; five actual synthetic export tests passed. Both PRs remain draft. No new CI or target/board verification.
+
+---
+
 # I2C recovery candidate — 2026-11-26
 
 At bd67087c9107a9056214fe1e6d008012318a2a64 added reusable retry state, ESP-IDF adapter changes and host regression. Six real host test runs passed on GCC/Clang; ten local blobs match. Experimental only; no target build, hardware or production use.
