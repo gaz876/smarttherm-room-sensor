@@ -1,7 +1,7 @@
 # Next steps
 
 ## Immediate
-1. Reconfirm all seven host tests from the exact published source tree with C++17, strict warnings and nonrecovering UBSan.
+1. Baseline: eight host tests passed locally; RecoveryAdapter published. Actual PID initialization and integration remain pending.
 2. Implement standalone OpenThermGuard and synthetic tests: finite bounded active CH target, valid configuration, no-demand CH off, explicit communication failure; preserve DHW and boiler protections.
 3. Audit changes before publication; verify published blobs and update journals.
 
