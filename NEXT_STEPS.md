@@ -1,33 +1,21 @@
 # Next steps
-Implement and test authenticated freshness across restarts, reserve setpoint and PID recovery. Audit CI separately before enabling it. Hardware integration requires bench validation.
-Host test: `g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc tests/test.cpp -o /tmp/safetytest && /tmp/safetytest`.
 
-## Reserve control requirements
-- Preserve original PID and weather-compensation algorithms.
-- Without room and outdoor measurements, use wired supply and return sensors, temperature difference and trends, and available OpenTherm flame/modulation telemetry.
-- Start from the last valid bounded heating setpoint; use a configured fixed fallback if unavailable or wired sensors fail.
-- Do not infer room temperature or heat demand from delta-T alone. Adaptive coefficients and limits require bench validation; no automatic adaptive actuation is approved yet.
-- Preserve boiler protections and DHW behavior. No relay switching for room sensor loss.
+## Immediate
+1. Reconfirm all seven host tests from the exact published source tree with C++17, strict warnings and nonrecovering UBSan.
+2. Implement standalone OpenThermGuard and synthetic tests: finite bounded active CH target, valid configuration, no-demand CH off, explicit communication failure; preserve DHW and boiler protections.
+3. Audit changes before publication; verify published blobs and update journals.
 
-## Wired sensor validation
-- Validate DS18B20 CRC, conversion completion, measurement age and configured physical limits before computing delta-T.
-- Negative delta-T alone is not a sensor fault.
-- Flame modulation and cycling are diagnostic only; never use them directly to select the reserve setpoint.
-- Compare boiler supply telemetry with wired supply for diagnostics when supported.
+## Subsequent
+- Integrate recovery ramp with verified original PID initialization, derivative history and timer handling; keep NORMAL blocked until validated.
+- Implement authenticated transport freshness across restarts and replay protection.
+- Develop reserve adjustment using wired supply/return readings and trends. Start from last valid bounded target; use fixed fallback if unavailable or wired readings fail. Delta-T alone cannot establish room temperature or demand. Negative delta-T alone is not a fault. Flame modulation and cycling are diagnostic only. Compare boiler and wired supply telemetry when supported.
+- Preserve original PID and weather compensation, DHW behavior and boiler protections. No relay switching for room sensor loss.
+- Integrate with original SmartTherm 0.8.4.16 only after source review; validate actual OpenTherm limits on Buderus U072-12K. Provisional active CH range 40–82 °C; user maximum may be lower within this range.
+- Bench validation before production or adaptive actuation. Audit CI separately before enabling workflows.
 
-Integrate WiredSensors validity with ReserveControl; implement recovery and authenticated freshness. Adaptive correction requires physical validation.
-
-Next: implement verified PID recovery and transport freshness; adaptive wired control remains unvalidated. Integration test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -Isrc tests/test_heating.cpp -o /tmp/test_heating && /tmp/test_heating.
-
-Integrate recovery ramp with verified PID initialization and handoff; keep NORMAL blocked until validated. Test: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc tests/test_ramp.cpp -o /tmp/test_ramp && /tmp/test_ramp.
-
-## Mandatory heating setpoint constraint
-- Enforce a provisional 40 °C minimum active CH setpoint across reserve, PID, weather compensation and recovery; validate upper limit and reject incompatible configuration.
-- Keep CH disabled when no heat demand; preserve DHW and boiler protections.
-- Revise synthetic tests and models that use active setpoints below 40 °C. Verify boundary and handoff behavior.
-- Verify actual OpenTherm accepted minimum on the physical Buderus Logamax U072-12K before revising the provisional floor.
-
-## Upper limit requirement
-Enforce 40–82 °C active CH range in all control paths, with a configurable lower user ceiling within that range. Reject incompatible configuration; validate final command before OpenTherm transmission. Test both boundaries, out-of-range requests and no-demand behavior. Verify physical boiler and OpenTherm limits before production deployment.
-
-Next: final OpenTherm command gate, PID tracking and authenticated freshness. Physical validation remains mandatory.
+## Host test command
+```sh
+for f in tests/*.cpp; do
+  g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc "$f" -o /tmp/safetytest && /tmp/safetytest || exit 1
+done
+```
