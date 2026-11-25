@@ -1,3 +1,18 @@
+# First successful ESP32-C3 target build — verified 2026-11-26
+
+Public main f7d7fe764ed6d09a195ed349cd17a15b9180044a, workflow blob 4b2f474b0f0d3fc40f369eaaea5c49f62a59b7b4, pinned source 08f487175b6995864285e420a72f0092a102c68f. Run 45632347131 / job 139268608712 completed success on 2026-11-25 UTC (14:17:02–14:18:55 log timestamps). All three job steps succeeded; full log retrieved (188594 characters, 1577 lines). All nine build-input Git blobs logged by the runner match current dev. Metadata read only, no apparent secret exposure in inspected output. Official image digest sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3, SDK v5.5.6 @ 880a203ae603d08a94d06aa01e0d6761958e5e9e, GCC esp-14.2.0_20260121 / 14.2.0 (compiler SHA256 789918490cee5a48112cae580f3279c08a26d37fbf738b8655b4b7dbe11f9957), Python 3.12.3, CMake 3.30.2, Ninja 1.11.1. Pip check passed; full installed package list and recursive submodule inventory in run log. Actual idf.py set-target esp32c3, build (1003/1003), size and file checks passed, ESP32C3_BUILD_OK printed. No compiler/CMake warning or error marker found in inspected log; expected nonfatal git rev-parse message because project inputs are archived without .git. 105 configured application components, 21 bootloader components; this is not the exact linked-component closure.
+
+Outputs recorded by runner:
+- room_sensor.bin 194848 bytes, SHA256 3806096a99740d9a661686b6b58d31e116960b335d561ce5f9095731f74d59d4
+- room_sensor.elf SHA256 ad224dd8817e5878e586c9004d5ec87701833fc1fb4ac13e64260267ac149aad
+- room_sensor.map SHA256 20c4a51f22137d8fc27719424ba9792c5aee94e2b797fa1647a872e4769d4354
+- bootloader.bin 20624 bytes, SHA256 3bb6bd344c160da155c3b9d56adf6a38d279e4d5f5973d518145656e3f7cb2cc
+- partition-table.bin 3072 bytes, SHA256 7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820
+
+Size report: image 194514 bytes before padding, static DRAM 60158/321296 bytes (18.72%), remainder 261138 bytes not measured runtime heap. Factory app 1 MiB, app binary 18.58% occupied, 853728 bytes free. Generated partition table verified in log: nvs 0x9000 24K, phy_init 0xf000 4K, factory 0x10000 1M. Configured flash 4MB; no OTA slots. Artifact API returned empty list by design, so bytes were not downloaded or independently hashed; do not claim downloadable firmware or independent binary verification. No flash, hardware, network integration or heating validation. Full dependency/advisory audit and hardware gates remain open. No code or workflow change in this checkpoint.
+
+---
+
 # ESP32-C3 CI input-copy fix — 2026-11-25
 
 First target run 45630874212 / job 139263403475 failed exit 1 before idf.py: cp -a attempted ownership preservation in the capability-restricted container. Full job log retrieved (20948 characters); runner Ubuntu 24.04.5, GITHUB_TOKEN Metadata read only, nine source blobs matched known baseline, image digest sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3 pulled successfully. SDK v5.5.6, pinned SDK HEAD and tracked diff checks passed, 27 recursive submodule status entries with no mismatch flags, GCC esp-14.2.0_20260121 / 14.2.0, compiler executable SHA256 789918490cee5a48112cae580f3279c08a26d37fbf738b8655b4b7dbe11f9957, Python 3.12.3, CMake 3.30.2, Ninja 1.11.1, pip check no broken requirements; installed Python inventory in original log. This is dependency compatibility evidence, not full advisory clearance. No compiled firmware or hardware test.

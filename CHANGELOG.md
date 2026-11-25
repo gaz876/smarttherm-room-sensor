@@ -1,3 +1,9 @@
+# First successful ESP32-C3 target build — verified 2026-11-26
+
+Run 45632347131 / job 139268608712 SUCCESS. Verified actual target compilation, 1003/1003 Ninja steps, generated BIN/ELF/MAP, partition table, output sizes and runner checksums in full log. Nine input blobs match dev; no downloadable artifacts retained. Documentation only.
+
+---
+
 # ESP32-C3 CI input-copy fix — 2026-11-25
 
 Inspected failed run 45630874212, reproduced ownership error locally and verified replacement copy command. Merged one-line CI fix PR #9 without reducing isolation. New run 45632347131 queued; target success pending.
