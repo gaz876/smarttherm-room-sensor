@@ -16,3 +16,5 @@ Added and verified standalone recovery setpoint slew limiter and nine assertions
 2026-11-25: HeatingLimits integrated into ReserveControl and RecoveryRamp; seven host test programs passed C++17 strict warnings and nonrecovering UBSan. Provisional 40–82 C limits; no hardware actuation or CI.
 
 2026-11-25: Reconciled project state and next steps with published baseline 13f07db. Historical test-pass reports retained; full seven-test rerun remains pending independent confirmation. OpenThermGuard not implemented. Documentation only.
+
+2026-11-25: Published standalone RecoveryAdapter and adapted test to 40 C floor. All eight host tests passed strict C++17 and nonrecovering UBSan. No actual PID handoff or actuation.
