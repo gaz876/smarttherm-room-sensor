@@ -1,11 +1,13 @@
 #include "room_measure.h"
 #include "room_i2c_retry.h"
+#include "room_board.h"
 #include "driver/i2c_master.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
+_Static_assert(ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL), "invalid I2C pin mapping");
 static const char *TAG="room_sensor";
 static bool tx(void *ctx,uint8_t cmd) {
     return i2c_master_transmit((i2c_master_dev_handle_t)ctx,&cmd,1,50)==ESP_OK;
@@ -65,7 +67,7 @@ void app_main(void) {
     room_measure m;
     room_init(&m);
     if (!room_configure(&m,CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0.0) ||
-        CONFIG_ROOM_I2C_SDA==CONFIG_ROOM_I2C_SCL) { ESP_LOGE(TAG,"Invalid configuration"); return; }
+        !ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL)) { ESP_LOGE(TAG,"Invalid configuration"); return; }
     sensor_i2c sensor={
         .cfg={.i2c_port=I2C_NUM_0,.sda_io_num=CONFIG_ROOM_I2C_SDA,
             .scl_io_num=CONFIG_ROOM_I2C_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7},
