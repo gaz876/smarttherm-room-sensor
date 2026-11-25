@@ -1,3 +1,25 @@
+# Current state — 2026-11-25
+
+Goal: prepare experimental extensions for original SmartTherm 0.8.4.16 with a wireless room sensor; preserve original PID, DHW and boiler protections. No original firmware modification or hardware deployment yet.
+
+Target architecture: SHT40 → MQTT → freshness/validity checks → original PID or bounded reserve → recovery ramp/PID handoff → OpenTherm command guard. Integration is pending.
+
+| Module | Verified scope |
+|---|---|
+| SafetyControl | Age, sequence, session and mode checks; authenticated transport pending |
+| WiredSensors | CRC, conversion, age and physical bounds |
+| ReserveControl | Weather target, last valid target or fixed fallback; adaptive reserve pending |
+| HeatingLimits | Provisional active CH 40–82 °C; actual OT limits pending |
+| RecoveryRamp | Bounded slew |
+| RecoveryAdapter | Cancellation and preparation flag; actual PID initialization pending |
+| HeatingControl | Combined prototype; NORMAL intentionally blocked |
+| OpenThermGuard | Decision only: fault/off/invalid/active; no transport or actuation |
+
+CI PASS 9/9: run 45531837467, job 138928787324, source f0ac3314d07b991f4913174b7c98614d5664f50c, workflow 7fb898d28ce5f001008eedfa46042f9d82e1ad3e. GCC 13.3.0, Ubuntu 24.04.5, strict C++17 and UBSan. PR 3 merged into safety-control at 932677fe9c1a8330c1708bb874213eac7009c913. No hardware validation. Room sensor dev at 5f5673f24183033d06b4d902c417e8062d9f9ad9: codec host test reported PASS; target build, MQTT and full firmware pending.
+
+---
+## Historical records (superseded where conflicting)
+
 # Project state
 
 As of 2026-11-25. Standalone experimental C++17 prototype, not production firmware.
