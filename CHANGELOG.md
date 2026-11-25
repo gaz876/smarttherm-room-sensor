@@ -1,3 +1,9 @@
+# Independent partial audit — 2026-11-25
+
+Repeated original codec test against three verified blobs, exit 0. Documentation only; no code, configuration, workflow, or release changed. This does not certify target firmware or MQTT.
+
+---
+
 # Current checkpoint — 2026-11-25
 
 Codec host test result recorded at prior dev HEAD 5f5673f24183033d06b4d902c417e8062d9f9ad9. No new executable changes or target build in this documentation cleanup.
