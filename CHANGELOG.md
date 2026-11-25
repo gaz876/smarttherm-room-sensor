@@ -1,3 +1,9 @@
+## 2026-11-25 — Independent full regression
+
+Nine existing host test executables rebuilt and run, nine exit 0; 17/17 Git blob hashes matched. Public run artifact lists empty. Documentation only; no executable changes or new CI.
+
+---
+
 # Independent partial audit — 2026-11-25
 
 Re-read historical public job logs and matched all 17 source/test blobs to the last CI baseline. Actual local SafetyControl test and independent guard/integration probes executed; observations show NORMAL continuity and restart replay limitations. Documentation only, no executable changes. Full audit remains open.

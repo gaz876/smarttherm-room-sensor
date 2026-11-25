@@ -1,3 +1,9 @@
+## Audit gate update — 2026-11-25
+
+Existing nine host regressions now independently reproduced. Remaining: full history/dependency/permissions/security audit, explicit invalid-sample and restart-freshness contract, integration and hardware tests. Do not enable NORMAL or start new functional modules before audit closure.
+
+---
+
 # Independent audit gate — 2026-11-25
 
 1. Close outstanding history/dependency/CI security review. Preserve prior evidence and rerun remaining test programs independently.
