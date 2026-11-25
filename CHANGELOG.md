@@ -1,3 +1,10 @@
+# Current checkpoint — 2026-11-25
+
+Codec host test result recorded at prior dev HEAD 5f5673f24183033d06b4d902c417e8062d9f9ad9. No new executable changes or target build in this documentation cleanup.
+
+---
+## Historical records (superseded where conflicting)
+
 # Changelog
 
 ## 2026-11-24
