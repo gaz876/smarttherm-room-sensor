@@ -1,6 +1,9 @@
 name: Safety host tests
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/safety-host-tests.yml']
 permissions: {}
 jobs:
   host-tests:
@@ -16,13 +19,13 @@ jobs:
           trap 'rm -rf "$work"' EXIT
           git -c credential.helper= clone --no-checkout -- https://github.com/gaz876/smarttherm-room-sensor.git "$work/repo"
           cd "$work/repo"
-          git checkout --detach da533974ded6bc8acbb8ad164f64d1f137bd0140
-          test "$(git rev-parse HEAD)" = da533974ded6bc8acbb8ad164f64d1f137bd0140
+          git checkout --detach f0ac3314d07b991f4913174b7c98614d5664f50c
+          test "$(git rev-parse HEAD)" = f0ac3314d07b991f4913174b7c98614d5664f50c
           g++ --version
-          tests=(tests/test.cpp tests/test_adapter.cpp tests/test_bounds.cpp tests/test_heating.cpp tests/test_limits.cpp tests/test_ramp.cpp tests/test_reserve.cpp tests/test_wired.cpp)
+          tests=(tests/test.cpp tests/test_adapter.cpp tests/test_bounds.cpp tests/test_guard.cpp tests/test_heating.cpp tests/test_limits.cpp tests/test_ramp.cpp tests/test_reserve.cpp tests/test_wired.cpp)
           for f in "${tests[@]}"; do
             g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=undefined -fno-sanitize-recover=all -Isrc "$f" -o "$work/test"
             "$work/test"
             printf 'PASS: %s\n' "$f"
           done
-          echo 'PASS: 8/8 host test programs'
+          echo 'PASS: 9/9 host test programs'
