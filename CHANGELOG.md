@@ -1,3 +1,10 @@
+# Current checkpoint — 2026-11-25
+
+PR 3 merged into experimental safety-control at 932677fe9c1a8330c1708bb874213eac7009c913; PR 4 enabled automatic pinned-source CI on main workflow changes. Run 45531837467 PASS 9/9, full logs inspected, Metadata read only, zero artifacts, no apparent secret leakage. GitHub-first policy applies; no production changes. Earlier local test claims are superseded by verified CI. Historical entries below are retained, not current status.
+
+---
+## Historical records (superseded where conflicting)
+
 # Changelog
 Initial standalone SafetyControl prototype and synthetic host tests.
 
