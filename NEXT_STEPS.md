@@ -1,3 +1,17 @@
+# Current next steps — 2026-11-25
+
+1. Review original SmartTherm 0.8.4.16 PID state, integral, derivative history and timing; design and test bumpless recovery. Keep NORMAL blocked until validated.
+2. Implement authenticated freshness/replay protection across restarts and adaptive reserve using valid wired trends; delta-T alone is not room demand.
+3. Integrate guard with actual command path, never send zero sentinel as active target; preserve CH off, DHW and boiler protections.
+4. Develop room sensor in dev: ESP-IDF target build, Wi-Fi, MQTT authorization, freshness, exact topics and full firmware.
+5. Review integration with original firmware; verify actual OT limits and hardware on bench before any deployment. Provisional 40–82 °C is not a verified OT range.
+6. Use GitHub for feasible work, pinned audited CI, synchronize journals public → private after each checkpoint. No paid resources or production deployment without approval.
+
+Completed: standalone guard and nine-program CI (run 45531837467). Historical tasks below are not active instructions.
+
+---
+## Historical records (superseded where conflicting)
+
 # Next steps
 
 ## Immediate
