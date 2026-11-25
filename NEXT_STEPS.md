@@ -1,3 +1,9 @@
+# Independent GPIO and artifact preparation retest — 2026-11-26
+
+Host regression at fixed GPIO source 598f896a1d3e0ca3d66b0b2674f9eee31528214e now independently complete; do not repeat solely for evidence. PRs #10/#11 remain experimental/draft. Remaining: applicable upload/SDK dependency audit and administrative review, actual target build, archive and inner-file verification, separate reviewed SBOM generation, bench confirmation of board/pull-ups and I2C recovery. No flash, production deployment, OTA, heating changes or private/paid CI.
+
+---
+
 # Provisional SuperMini GPIO profile and artifact CI preparation — 2026-11-26
 
 Review PRs #10/#11 at pinned source 598f896a1d3e0ca3d66b0b2674f9eee31528214e and workflow 416ad8810712e2c1c10a2175d6443c617cc217a6. Complete applicable upload action and SDK dependency review and administrative gate before enabling workflow. Then actual target compile, archive download and independent checksum/content verification; separate reviewed SBOM generation. Full host regression rerun on exact source, bench confirm board revision, 3.3 V pull-ups and physical I2C recovery. No flash, production/OTA, heating or paid/private CI. Revert experimental changes by reviewed commit, not history rewrite.
