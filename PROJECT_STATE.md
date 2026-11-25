@@ -1,3 +1,9 @@
+# Active room sensor development — 2026-11-25
+
+`dev` is the sole active integration branch for the standalone ESP32-C3/SHT40 sensor. Fast-forwarded from 77ed5aa34e8b0321a6e48c98b8ef1aa1cb06b4e8 to existing public measurement commit 9b7281f7f384f7fe07b93e6e3f02d572165544d0; original experimental branch preserved. Independent repeat of `sh tests/run_host.sh` at that source: all seven Git blobs matched docs/MEASUREMENT_STAGE.md; GCC 14.2.0 and Clang 17.0.0, four executions exit 0, strict C11/UBSan. This is a development baseline, not an approved target firmware. SDK/dependency and full history audit, target build, physical I2C and transport freshness remain open. Heating safety work is paused; no boiler integration, OTA or changes to main/safety-control. Existing audit gates retained.
+
+---
+
 # Experimental measurement stage — 2026-11-25
 
 Standalone measurement candidate: restart clearing, validated scheduling and freshness, SHT40 I2C adapter and ESP-IDF scaffold. Four actual host test executions exit 0 on GCC and Clang; target adapter not built or tested on hardware. See docs/MEASUREMENT_STAGE.md for scope, exact source hashes, commands and audit limitations. No transport or boiler control. No new CI.
