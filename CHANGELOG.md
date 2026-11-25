@@ -1,3 +1,9 @@
+# Measurement regression checkpoint — 2026-11-25
+
+Reproduced existing state-machine test on GCC and Clang, 2/2 exit 0, five matching Git blobs. Details in PROJECT_STATE.md. Documentation only.
+
+---
+
 # SDK audit checkpoint — 2026-11-25
 
 Verified official v5.5.6 tag and recommended target compiler manifest; independently reran original codec on two host compilers, 2/2 exit 0 with three matching blobs. Documented SDK/network blocker, GPIO constraints, initialization recovery and partition planning. Documentation only; no target build, source/configuration change, CI or deployment.
