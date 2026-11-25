@@ -1,3 +1,9 @@
+# Isolated ESP32-C3 CI — 2026-11-25
+
+Created and merged standalone pinned-image target build workflow via public PR #8. Actual first Actions run 45630874212 started, result pending. No firmware code change, artifact publication, paid runner or deployment.
+
+---
+
 # Build input review — 2026-11-25
 
 Read official live Python constraints via web, recorded exact recommended compiler archive metadata, confirmed default full-component build and default single-app partition choice. Rechecked unavailable local toolchain and failed alternate download. Documentation only; no build or deployment.
