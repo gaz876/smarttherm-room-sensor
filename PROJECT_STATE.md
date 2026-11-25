@@ -1,18 +1,21 @@
 # Project state
-Experimental standalone state machine; not production firmware. Host C++17 tests passed with strict warnings and UBSan. No workflows, hardware access or network code. Transport authentication, freshness across restarts, PID recovery and reserve setpoint remain unimplemented.
 
-Reserve sensor validation requirements documented. Adaptive control and hardware validation remain pending.
+As of 2026-11-25. Standalone experimental C++17 prototype, not production firmware.
 
-Current update: WiredSensors and bounded ReserveControl prototypes are published. ReserveControl host tests passed (six assertions, C++17, strict warnings, UBSan). Adaptive adjustment and integration remain pending.
+## Implemented in safety-control
+- SafetyControl: mode transitions, sample age, sequence and session checks; authenticated transport freshness is assumed, not implemented.
+- WiredSensors: CRC and conversion flags, age, physical bounds and supply/return delta.
+- ReserveControl: weather target, previous target hold with valid wired readings, fixed fallback.
+- HeatingLimits: provisional active CH range 40–82 °C, configurable narrower range.
+- RecoveryRamp: standalone bounded slew limiter.
+- HeatingControl: combines safety, wired validation and reserve selection. NORMAL intentionally blocked pending PID handoff.
 
-HeatingControl integration published. Host GCC 14.2 C++17 strict warnings and UBSan integration test passed. NORMAL intentionally blocked pending PID recovery. No actuation.
+## Verification
+Seven host test files are published. Earlier reports record C++17 strict warnings and UBSan passes; full seven-program execution has not been independently reconfirmed in the latest review. No CI or physical actuation validation.
+40 °C is the user-reported front-panel minimum; actual OpenTherm limits remain unverified. No heat demand must mean CH off, not a 40 °C demand. Final command enforcement is pending. Preserve DHW and boiler protections.
 
-RecoveryRamp and test_ramp.cpp published; exact Git blob hashes matched host copies. GCC 14.2 C++17 strict warnings and nonrecovering UBSan test passed. PID handoff remains blocked.
+## Pending
+Final OpenTherm command guard, authenticated freshness across restarts, adaptive reserve adjustment, PID handoff, integration with original SmartTherm 0.8.4.16 and bench validation. No production deployment.
 
-## Buderus minimum heating setpoint
-User reports a 40 °C minimum heating setpoint on the Buderus Logamax U072-12K front panel. OpenTherm minimum is not yet verified. Pending hardware validation, enforce 40 °C as the minimum active CH setpoint for reserve, PID, weather compensation and recovery. No heat demand means CH request off, not continuous heating at 40 °C. This requirement is documented, not yet implemented.
-
-## Upper heating setpoint limit
-Provisional active CH setpoint range: 40–82 °C. The configured user maximum may be lower but must not be below 40 °C or above 82 °C. This is a software policy pending physical OpenTherm validation, not a verified protocol limit. No demand means CH off. DHW and boiler protections remain separate.
-
-2026-11-25: HeatingLimits integrated into ReserveControl and RecoveryRamp; seven host test programs passed C++17 strict warnings and nonrecovering UBSan. Provisional 40–82 C limits; no hardware actuation or CI.
+## Repository baseline
+Last code-and-journal baseline before this documentation cleanup: 13f07db4a04d99738e0ef984ee3fb4703cad7ed0.
