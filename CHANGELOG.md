@@ -1,3 +1,9 @@
+# ESP-IDF build gate recheck — 2026-11-25
+
+Rechecked current dev, direct SDK component manifests and Python requirements; identified need to audit resolved constraints and actual component closure, and optional MINIMAL_BUILD. Reconfirmed unavailable target environment and inaccessible CI administrative checks. Documentation only; no target build, CI, code or configuration changes.
+
+---
+
 # Measurement regression checkpoint — 2026-11-25
 
 Reproduced existing state-machine test on GCC and Clang, 2/2 exit 0, five matching Git blobs. Details in PROJECT_STATE.md. Documentation only.
