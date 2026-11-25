@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=08f487175b6995864285e420a72f0092a102c68f
+          source_sha=598f896a1d3e0ca3d66b0b2674f9eee31528214e
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -56,11 +56,13 @@ jobs:
             cd /tmp/room_sensor
             idf.py set-target esp32c3
             idf.py build
+            grep -qx "CONFIG_ROOM_I2C_SDA=4" sdkconfig
+            grep -qx "CONFIG_ROOM_I2C_SCL=5" sdkconfig
             idf.py size | tee /tmp/size.txt
             idf.py size-components > /tmp/size-components.txt
             idf.py size-files > /tmp/size-files.txt
             python "$IDF_PATH/components/partition_table/gen_esp32part.py" build/partition_table/partition-table.bin > /tmp/partitions.txt
-            sha256sum build/room_sensor.bin build/room_sensor.elf build/room_sensor.map build/bootloader/bootloader.bin build/partition_table/partition-table.bin
+            sha256sum build/room_sensor.bin build/room_sensor.elf build/room_sensor.map build/bootloader/bootloader.bin build/partition_table/partition-table.bin | sed -E "s#  build/(bootloader/|partition_table/)?#  #" | tee /tmp/binary-sha256.txt
             echo ESP32C3_BUILD_OK
           ')"
           docker start -a "$cid" 2>&1 | tee "$out/build.log"
@@ -83,12 +85,14 @@ jobs:
           copy_file /tmp/size-components.txt size-components.txt
           copy_file /tmp/size-files.txt size-files.txt
           copy_file /tmp/partitions.txt partitions.txt
+          copy_file /tmp/binary-sha256.txt binary-sha256.txt
           cd "$out"
-          files=(source-blobs.txt provenance.txt image.txt build.log room_sensor.bin room_sensor.elf room_sensor.map bootloader.bin partition-table.bin project_description.json sdkconfig submodules.txt python-packages.txt os-packages.txt size.txt size-components.txt size-files.txt partitions.txt)
+          files=(source-blobs.txt provenance.txt image.txt build.log room_sensor.bin room_sensor.elf room_sensor.map bootloader.bin partition-table.bin project_description.json sdkconfig submodules.txt python-packages.txt os-packages.txt size.txt size-components.txt size-files.txt partitions.txt binary-sha256.txt)
           test "$(find . -mindepth 1 -maxdepth 1 | wc -l)" = "${#files[@]}"
           for f in "${files[@]}"; do test -f "$f" && test ! -L "$f" && test -s "$f" || exit 1; done
+          sha256sum -c --strict binary-sha256.txt
           sha256sum "${files[@]}" > SHA256SUMS.txt
-          sha256sum -c SHA256SUMS.txt
+          sha256sum -c --strict SHA256SUMS.txt
           echo ESP32C3_ARTIFACT_SET_OK
       - name: Retain experimental public artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
