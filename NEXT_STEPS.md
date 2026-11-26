@@ -1,3 +1,12 @@
+# 2026-11-27 — HTTPS footprint measured; partition does not fit
+
+- PR #27 workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8, run 45906704171, job 140205056464 succeeded as a measurement, NOT a deployable build. Actual SDK build exit 2, explicit factory overflow 0x12d0, HTTPS_PARTITION_OVERFLOW_CONFIRMED and HTTPS_FOOTPRINT_MEASURED. No warning lines, token Metadata: read, zero uploaded artifacts. Pinned source 1d005d634705baa187af55fb21f7b548c642da93; no runtime HTTPS calls, partition change or flash.
+- Linked HTTPS dependency measurement: bin 1053392 bytes vs baseline 934224 (+119168), current 1048576-byte factory partition exceeded by 4816. Static DRAM 112930 vs 112812 (+118); remaining static budget 208366, not runtime heap. Flash code 817006; total image size 1053024 unpadded. Actual TLS connections, certificates, browser UI, MQTT and runtime heap are not measured.
+- Proposed design for review only: 2 MiB single factory app at 0x120000..0x31ffff, retain nvs 0x9000..0xefff, phy_init 0xf000..0xffff and room_wifi 0x110000..0x115fff unchanged; original factory region 0x10000..0x10ffff remains unused and intact if migration writes only new app/table, enabling a potential rollback to old table. 896 KiB free after new app. New app headroom against inert measurement 1043760 bytes. App offset 64 KiB aligned, all ranges inside declared 4 MiB. This is arithmetic/design review, not SDK-generated or hardware-verified layout. Do not modify actual partition table before explicit approval, physical flash verification, backup and recovery assessment; migration/rollback not proven, no OTA introduced. Reference: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-guides/partition-tables.html
+- Alternative: reduce footprint without weakening TLS/security, but current 1 MiB already exhausted before browser UI and MQTT. Recommend offline validation of proposed layout after approval; preserve previous known-good firmware and data, no device writes. Close standalone PR #27 without merge.
+
+---
+
 # 2026-11-27 — Inert HTTPS footprint experiment
 
 - Draft PR #27, ci/https-footprint-20261127, workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8; run 45906704171 status at capture in_progress, conclusion pending. Do not duplicate; inspect final logs, linker symbols, size and build exit before reporting measurement.
