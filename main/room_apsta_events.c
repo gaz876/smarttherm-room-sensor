@@ -33,6 +33,12 @@ bool room_apsta_events_poll(room_apsta_events *s,room_apsta_session *session) {
     if (atomic_load(&s->overflow)) { room_apsta_session_lost(session); return false; }
     return uxQueueMessagesWaiting(s->queue)==0;
 }
+bool room_apsta_events_discard(room_apsta_events *s) {
+    if (!s || !s->bound || s->failed) return false;
+    room_apsta_event e;
+    for (unsigned i=0;i<8;i++) if (xQueueReceive(s->queue,&e,0)!=pdPASS) break;
+    return uxQueueMessagesWaiting(s->queue)==0;
+}
 bool room_apsta_events_unbind(room_apsta_events *s) {
     if (!s || !s->queue) return false;
     s->bound=false;
