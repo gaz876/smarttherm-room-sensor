@@ -22,5 +22,7 @@ typedef struct {
 } room_apsta_events;
 bool room_apsta_events_bind(room_apsta_events *, QueueHandle_t);
 bool room_apsta_events_poll(room_apsta_events *, room_apsta_session *);
+/* Teardown only: discard queued records without clearing the overflow latch. */
+bool room_apsta_events_discard(room_apsta_events *);
 bool room_apsta_events_unbind(room_apsta_events *);
 #endif
