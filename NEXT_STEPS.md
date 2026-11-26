@@ -1,3 +1,11 @@
+# 2026-11-26 — Browser trust gate and inert Russian preview
+
+- Verified run 45784779902: 51 GCC ASan/UBSan scenarios and target build for 4616624dd00abe44f0b2dabce2b44b657c85383d; artifact 15099603667; CI digest f8b62b8d3900284c5600f23adebdd965fb0517679c23a04acb7199ea33416beb (independent archive verification pending). Clang absent.
+- Added docs/BROWSER_SETUP.md and docs/setup-preview.html. Ordinary private-IP HTTP is not a trusted browser origin for Web Crypto; choose authenticated HTTPS as proposed design pending actual phone trust setup and identity provisioning review. No plaintext credential path. Preview is disabled, no JS/network/form submission, no firmware embedding. Checked static markup for absence of active or external resources; not rendered on phone.
+- Documentation/UI-only commit, no firmware source or CI changes; no new firmware build necessary to validate documentation. Existing successful build belongs to earlier firmware commit. Remaining: review exact SDK HTTPS APIs, actual trust provisioning and browser Security2 interoperability, implement bounded AP-only backend and test hardware. No activation, eFuse, deployment, protected merge or Cloudflare changes.
+
+---
+
 # 2026-11-26 — Optional bounded phone channel candidate
 
 - Added owner-polled packet/reply transport boundary: fixed 4096-byte input, one in-flight reply, nonblocking backend contract, explicit partial send accounting, event/deadline checks, buffer wipe, and backend drain before releasing pending response or tearing down radio. Optional local attachment to existing APSTA link. Backend is not implemented yet; no listening socket, HTTP parser, client or startup caller. Backend must later prove AP-only bind and single peer, no retained buffer pointers, bounded execution and confirmed drain. The standard Espressif SoftAP/HTTP Security2 transport is a reference, not verified compatible with this project's custom commands. See https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/provisioning/protocomm.html .

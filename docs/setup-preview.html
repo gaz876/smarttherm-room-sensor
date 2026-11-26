@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'">
+<title>SmartTherm — настройка датчика (макет)</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;line-height:1.5;--accent:#176b86;--border:#8296a580}
+*{box-sizing:border-box}body{margin:0;background:Canvas;color:CanvasText}
+main{max-width:34rem;margin:auto;padding:1.25rem}
+header{margin:0 0 1.25rem}h1{font-size:1.55rem;line-height:1.25;margin:.2rem 0}
+small{color:GrayText}section{border:1px solid var(--border);border-radius:1rem;padding:1rem;margin-bottom:1rem}
+h2{font-size:1.05rem;margin:0 0 .65rem}.status{border-left:4px solid #b7791f}
+fieldset{border:0;padding:0;margin:0;min-width:0}label{display:block;margin:.8rem 0 .25rem;font-weight:600}
+input,button{font:inherit;width:100%;min-height:3rem;padding:.65rem .75rem;border-radius:.65rem;border:1px solid var(--border)}
+button{margin-top:1rem;background:var(--accent);color:white;font-weight:600}input:disabled,button:disabled{opacity:.7;cursor:not-allowed}
+ol{margin:.5rem 0;padding-left:1.6rem}li{margin:.35rem 0}
+.note{font-size:.9rem}footer{font-size:.8rem;color:GrayText}
+</style>
+</head>
+<body>
+<main>
+<header><small>ESP32-C3 · SHT40</small><h1>SmartTherm<br>Комнатный датчик</h1><p>Первоначальная настройка Wi-Fi</p></header>
+<section class="status" aria-labelledby="status-title">
+<h2 id="status-title">Защищённое соединение не установлено</h2>
+<p>Это демонстрационный макет. Поля и отправка отключены. Настоящие пароли здесь не вводятся.</p>
+</section>
+<section aria-labelledby="identity-title">
+<h2 id="identity-title">1. Подтверждение устройства</h2>
+<p class="note">В рабочей версии сначала проверяется доверенное соединение, затем индивидуальная идентификация датчика.</p>
+<fieldset disabled>
+<label for="identity">Идентификатор устройства</label><input id="identity" type="text" placeholder="Недоступно">
+<label for="proof">Код настройки</label><input id="proof" type="password" placeholder="Недоступно" autocomplete="off">
+<button type="button">Подтвердить</button>
+</fieldset>
+</section>
+<section aria-labelledby="wifi-title">
+<h2 id="wifi-title">2. Домашняя сеть</h2>
+<fieldset disabled>
+<label for="ssid">Название Wi-Fi (SSID)</label><input id="ssid" type="text" placeholder="Название сети 2,4 ГГц">
+<label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" placeholder="Недоступно" autocomplete="off">
+<p class="note">IP-адрес: автоматически (DHCP).</p>
+<button type="button">Проверить подключение</button>
+<button type="button">Сохранить настройки</button>
+</fieldset>
+</section>
+<section>
+<h2>3. Завершение</h2>
+<ol><li>Проверка подключения к роутеру</li><li>Получение IP-адреса</li><li>Сохранение и контрольное чтение</li><li>Закрытие точки доступа датчика</li></ol>
+<p class="note">После настройки откройте основной интерфейс по адресу, выданному роутером.</p>
+</section>
+<footer>Демонстрация интерфейса · Без интернета, внешних ресурсов и передачи данных</footer>
+</main>
+</body>
+</html>
