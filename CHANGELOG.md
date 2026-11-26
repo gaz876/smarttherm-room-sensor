@@ -1,3 +1,11 @@
+# 2026-11-26 — Combined real-adapter host integration fixture
+
+- Added a shared SDK mock for actual room_wifi_idf, room_wifi_apsta_link, room_apsta_task, events, session and Security2 transport adapter; the cryptographic SDK remains a synthetic mock, no network/phone traffic. The single driver mock asserts exclusive init, complete cleanup and barrier order. Six independent process cases: disconnect, expiry, revoked readiness, unavailable provider, rejected prepare and partial AP start; seventh case stalls STA cleanup and confirms quarantine. The test also checks protected profile reload and disabled AP event capture during STA.
+- New fixture not yet compiled or executed. Previous c5a7f63629ba9df7f879106e59f4f19643694b06 target build and nine GCC ASan/UBSan scenarios passed in 45779558292, artifact 15097602319, CI digest 274fcfd4da7b65eceb17dc02f38aab1c754b43aef8e77b6ba75588af66e38046. Clang unavailable in CI; independent archive verification pending.
+- No production source changes, startup activation, real identity material, phone listener, eFuse changes, merge or deployment. Remaining: actual provider/lifetime, first-boot, phone transport and physical testing; MQTT follows.
+
+---
+
 # 2026-11-26 — Single network owner adapter candidate
 
 - Optional, uncalled STA/APSTA binding: the existing wifi_owner policy dispatches both real adapters, and the STA adapter binds to its actual task handle. The optional APSTA link wraps the real persistent room_apsta_task, only accepts a trusted local provider after STA initialization and before first radio start, and does not expose any packet or listener API. Physical BOOT remains the only manual setup trigger. Normal startup is unchanged and supplies no provider. Missing/corrupt first-boot setup is still not wired.
