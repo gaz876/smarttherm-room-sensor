@@ -1,3 +1,9 @@
+# Phone request framing checkpoint — 2026-11-26
+
+Parser and standalone host test verified at 8f742d170bb8664dacc96013f60da39c20e0bef7; no need to rerun unchanged tests. Next: design bounded reply/dispatch and transport lifecycle with explicit authenticated session ownership, rate limits, cleanup and close/response ordering. Verify SDK Security2 buffer ownership, per-device identity enrollment, Android client, actual AP/STA trial and fresh DHCP, partition/heap budget and applicable advisories before network integration. Parser does not authenticate or validate profile semantics. No plaintext fallback, automatic key/eFuse writes, hardware, OTA, heating or paid/private CI. Target build only after relevant integration.
+
+---
+
 # Phone setup transport checkpoint — 2026-11-26
 
 Target run 45740340743 independently verified; do not rebuild unchanged source. New phone session owner tests passed; review protected transport input/buffer lifecycle, Mbed TLS advisory applicability, per-device identity, Android client protocol and actual AP/STA ownership. Confirm flash/heap budget before adding transport. No plaintext fallback, automatic eFuse writes, hardware or unrelated test repetition.
