@@ -1,7 +1,7 @@
 name: ESP32-C3 experimental build
 on:
-  workflow_dispatch:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
     branches: [main]
     paths: ['.github/workflows/esp32c3-build.yml']
 permissions: {}
@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/sec2-footprint-20261126'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -18,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=acf173951e25b275173590add4706a8539480270
+          source_sha=db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -58,6 +59,14 @@ jobs:
             idf.py build
             grep -qx "CONFIG_ROOM_I2C_SDA=4" sdkconfig
             grep -qx "CONFIG_ROOM_I2C_SCL=5" sdkconfig
+            grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y" sdkconfig
+            ! grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0=y" sdkconfig
+            ! grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1=y" sdkconfig
+            grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
+            riscv32-esp-elf-nm build/room_sensor.elf > /tmp/link-symbols.txt
+            for sym in room_sec2_transport_start room_sec2_transport_exchange room_sec2_transport_finish room_sec2_transport_destroy protocomm_security2; do
+              grep -E "[[:space:]]$sym$" /tmp/link-symbols.txt || exit 1
+            done
             idf.py size | tee /tmp/size.txt
             idf.py size-components > /tmp/size-components.txt
             idf.py size-files > /tmp/size-files.txt
