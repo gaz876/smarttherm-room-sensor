@@ -1,0 +1,1 @@
+Standalone compile-only capability probe for a separately verified ESP-IDF v6.1.1 image/source. Run idf.py set-target esp32c3 and idf.py build inside this directory in that pinned environment. No network, credentials, server or flash action. Not part of the main firmware. Compilation alone cannot establish interface isolation or bounded shutdown.

@@ -1,3 +1,10 @@
+# 2026-11-26 — Exact SDK HTTPS isolation audit
+
+- Verified pinned ESP-IDF commit 880a203ae603d08a94d06aa01e0d6761958e5e9e reports v5.5.6. Its HTTP server binds wildcard address and lacks the interface-name configuration field. HTTPS uses the same HTTP server; stop waits for the server thread without an overall bounded deadline. SDK copies private key buffer and directly frees that particular copy; application wiping alone cannot certify full SDK key erasure.
+- Verified official v6.1.1 tag resolves to 051e4c4eb20346e043cdd47bc388fde75ff8af63. Header and implementation expose interface-specific bind with failure returned, and HTTPS default configuration includes it. Stop remains blocking. Prefer isolated migration qualification over custom HTTP parsing or wildcard listener. Exact v6.1.1 Docker digest not verified; no toolchain change, new CI run or network activation. Added standalone compile-only HTTPS API probe (not yet built) and source evidence in docs/HTTPS_SDK_AUDIT.md. No real keys, eFuse, protected-branch merge or deployment.
+
+---
+
 # 2026-11-26 — Browser trust gate and inert Russian preview
 
 - Verified run 45784779902: 51 GCC ASan/UBSan scenarios and target build for 4616624dd00abe44f0b2dabce2b44b657c85383d; artifact 15099603667; CI digest f8b62b8d3900284c5600f23adebdd965fb0517679c23a04acb7199ea33416beb (independent archive verification pending). Clang absent.
