@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=647b0e4437a9f6125e313af0c315dbd56863e5b1
+          source_sha=5cffd1dbb4592bd1bcb480c035bdc6e217135ff1
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -31,8 +31,8 @@ jobs:
           git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
           test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
           mkdir "$work/input"
-          git -C "$work/repo" archive "$source_sha" CMakeLists.txt main src sdkconfig.defaults | tar -x -C "$work/input"
-          git -C "$work/repo" ls-tree -r "$source_sha" -- CMakeLists.txt main src sdkconfig.defaults | tee "$out/source-blobs.txt"
+          git -C "$work/repo" archive "$source_sha" CMakeLists.txt main src sdkconfig.defaults tests | tar -x -C "$work/input"
+          git -C "$work/repo" ls-tree -r "$source_sha" -- CMakeLists.txt main src sdkconfig.defaults tests | tee "$out/source-blobs.txt"
           printf 'source=%s\nimage=%s\nsdk=%s\nworkflow=%s\n' "$source_sha" "$image" 880a203ae603d08a94d06aa01e0d6761958e5e9e "$GITHUB_SHA" > "$out/provenance.txt"
           docker pull --platform linux/amd64 "$image"
           docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image" | tee "$out/image.txt"
@@ -72,6 +72,24 @@ jobs:
             python "$IDF_PATH/components/partition_table/gen_esp32part.py" build/partition_table/partition-table.bin > /tmp/partitions.txt
             sha256sum build/room_sensor.bin build/room_sensor.elf build/room_sensor.map build/bootloader/bootloader.bin build/partition_table/partition-table.bin | sed -E "s#  build/(bootloader/|partition_table/)?#  #" | tee /tmp/binary-sha256.txt
             echo ESP32C3_BUILD_OK
+            # Real repository integration fixtures; all execution stays in the
+            # already pinned, offline, capability-dropped build container.
+            mkdir /tmp/room_host
+            command -v gcc
+            for cc in gcc clang; do
+              if ! command -v "$cc" >/dev/null; then echo "HOST_COMPILER_UNAVAILABLE $cc"; continue; fi
+              "$cc" --version | head -n 1
+              for t in session events task; do
+                extra=()
+                case "$t" in
+                  events) extra=(main/room_apsta_events.c);;
+                  task) extra=(main/room_apsta_events.c main/room_apsta_task.c);;
+                esac
+                "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Itests/mock_apsta_owner -Itests/mock_sec2_transport -Itests/mock_task -Itests/mock_events "tests/test_room_apsta_$t.c" main/room_apsta_session.c main/room_sec2_transport.c "${extra[@]}" -o "/tmp/room_host/$cc-$t"
+                timeout 15s "/tmp/room_host/$cc-$t"
+                echo "HOST_INTEGRATION_OK $cc $t"
+              done
+            done
           ')"
           docker start -a "$cid" 2>&1 | tee "$out/build.log"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$cid")" = 0
