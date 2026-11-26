@@ -1,3 +1,9 @@
+# Experimental station binding — 2026-11-26
+
+Added ESP-IDF station-only adapter candidate and mock tests; six final executions passed. Real target and network task integration pending, no credentials or AP. Existing main.c unchanged.
+
+---
+
 # Wi-Fi transport owner — 2026-11-26
 
 Added and tested generation-aware transport lifecycle and BOOT gesture. Two actual host runs passed. No firmware or hardware changes.

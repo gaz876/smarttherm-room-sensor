@@ -1,3 +1,16 @@
+# ESP-IDF station binding candidate — 2026-11-26
+
+`main/room_wifi_idf.c` implements a station-only binding, no caller in main.c. The future dedicated owner task provides an authorized profile in RAM (SSID 1–32 nonzero bytes, printable WPA2/3 passphrase 8–63 bytes; 64-digit raw PSK and other auth types not supported). Wi-Fi NVS flag disabled and RAM storage selected; no credential persistence or logging by application. No AP. GPIO9 is active-low input with pull-up after boot; a 3 s gesture is reported to the future provisioning task, not acted upon. New default DHCP interface each attempt; no raw SDK IP/disconnect event accepted as authoritative; online requires live association, interface up and nonzero current IP. Stop, wait default event loop barrier, detach/destroy, deinit, second barrier before reuse. Barriers drain queued events but do not prove actual vendor producer quiescence; bench stress tests and actual concurrent/event sequencing required. Ambiguous partial init/attach/clear fails closed to avoid unsafe cleanup; not a full automatic recovery solution. No actual Wi-Fi task, network service or credentials. Direct pinned SDK source reviewed: wifi_default.c 874b3f1788d251329a9e8778748e1e2593d46171; esp_wifi.h 8c03384f53eb68f77f505a589478cb2ca007d3b2; esp_wifi_default.h d30d512e3588e738026bf7edc0b98ade2b8cd27d; esp_netif.h bb21f418595eb55ca896e4c69b6608f221cd9900. Host test command (from root):
+
+```sh
+for cc in gcc clang; do
+    "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=undefined -fno-sanitize-recover=all -Itests/mock_wifi -Isrc -Imain main/room_wifi_idf.c tests/test_room_wifi_idf.c -o "/tmp/wifi-idf-$cc" || exit 1
+    for mode in normal attach start; do timeout 10s "/tmp/wifi-idf-$cc" "$mode" || exit 1; done
+done
+```
+
+---
+
 # Transport owner checkpoint — 2026-11-26
 
 `src/room_wifi_owner.h` provides the single-owner lifecycle and BOOT gesture. Transport callbacks must return true from stop only once the previous event source is quiescent; this is a contract, not yet proven for ESP-IDF. Events have producer-bound generation IDs; deadline wins, cleanup failures block new starts, and setup success is only a trusted verified persistence event. BOOT starts disarmed and requires stable release before a 3 s hold (50 ms debounce). GPIO9 physical binding and strapping still need bench verification. Run the new test with GCC/Clang using the command below replacing test_room_wifi_policy.c with test_room_wifi_owner.c. Official SDK references reviewed for Wi-Fi station events and provisioning (v5.5.6), GPIO9 strapping and default event loop; network transport not enabled.
