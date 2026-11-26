@@ -1,3 +1,11 @@
+# 2026-11-27 — Partition CSV ordering correction
+
+- PR #28 initial run 45910641021, job 140217880963, workflow b66009136bb4481e69438fa11179eda85e996b41 failed before compilation: SDK CSV generator reported line 6 overlap because relocated factory row preceded the lower-offset room_wifi row. Addresses themselves do not intersect. No firmware was compiled or flashed by that attempt.
+- Corrected only experimental workflow in commit 3c6b04341752471b3d27a5468264d8e3ff5957e9: remove original factory row, append relocated factory after room_wifi, assert exact order, offsets and 2M size before SDK validation. No security check removed. All original data offsets and proposed factory range unchanged.
+- Replacement run 45912021281 status at capture in_progress, conclusion pending. Do not duplicate. Review final generator/roundtrip/flash manifest and build results before accepting layout. No candidate code/config change, main merge, firmware upload, hardware operation or OTA. Physical Flash and rollback remain untested.
+
+---
+
 # 2026-11-27 — Approved offline 2 MiB partition validation
 
 - User explicitly approved experiment only: relocated 2 MiB factory at 0x120000, preserve NVS/PHY/room_wifi offsets, no device writes or OTA. Draft PR #28, ci/partition-2m-20261127, workflow b66009136bb4481e69438fa11179eda85e996b41; run 45910641021, status in_progress, conclusion pending. Do not duplicate. Inspect actual SDK generation, build, symbols, size, flash manifest and all checks before claiming PASS.
