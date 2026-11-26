@@ -1,3 +1,9 @@
+# AP/STA integration target build pending — 2026-11-26
+
+Check run 45760537263/job 139709205908 for pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, verify full log, linked symbols, artifact hashes/source manifest and footprint. Task integration currently uncalled; next actual exclusive station handoff and queue allocation, trusted identity/bootstrap, secure SDK credential buffer disposal, bounded live socket and physical AP/STA/DHCP/channel/cleanup. Provisional 5 s cleanup deadline is not preemption, event barriers require physical proof; lockout is not radio-off guarantee. No automatic eFuse/OTA/heating or paid/private CI. Queue retained: phone client, protected NVS hardware tests, dynamic RAM, MQTT compatibility and broker. No unrelated old tests or repeat build of unchanged source.
+
+---
+
 # Dual-netif AP/STA owner checkpoint — 2026-11-26
 
 Continue from 6ba25177d679fb0fd5fa24596b173071d0810a23. Next bind exclusive network task, actual event barriers and bounded cleanup deadline, independent fresh DHCP event proof, bridge/transport lifecycle and trusted identity. Do not expose AP or credentials until applicable SDK buffer disposal and dependency gates reviewed. Target compile/build after relevant linked integration. Queue retained: initial phone setup, protected NVS hardware recovery/confidentiality, dynamic heap/stack measurement and MQTT compatibility/broker. One trial per window provisional; improve retry only after safe isolation. No old test repetition, automatic eFuse/OTA/heating, paid/private CI or main merge.
