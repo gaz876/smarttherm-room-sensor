@@ -1,3 +1,123 @@
+# AP/STA task target build complete — 2026-11-26
+
+Pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, run 45760537263, artifact 15088994612 verified. Test checkpoint 729618d86862f8c050b2646899c3a720902c01a7. Next station-to-AP exclusive runtime handoff and queue allocation, trusted per-device identity, SDK decrypted-buffer disposal and reviewed real socket lifecycle, actual phone setup and DHCP/channel/cleanup tests. Keep activation blocked pending these gates. Protected NVS physical tests, dynamic heap/stack and MQTT broker remain queued. 153680 B free in factory partition; not runtime memory proof. No unrelated old tests/rebuild, automatic eFuse/OTA/heating or paid/private CI. PR #17/#20 draft; no main merge.
+
+---
+
+# AP/STA integration target build pending — 2026-11-26
+
+Check run 45760537263/job 139709205908 for pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, verify full log, linked symbols, artifact hashes/source manifest and footprint. Task integration currently uncalled; next actual exclusive station handoff and queue allocation, trusted identity/bootstrap, secure SDK credential buffer disposal, bounded live socket and physical AP/STA/DHCP/channel/cleanup. Provisional 5 s cleanup deadline is not preemption, event barriers require physical proof; lockout is not radio-off guarantee. No automatic eFuse/OTA/heating or paid/private CI. Queue retained: phone client, protected NVS hardware tests, dynamic RAM, MQTT compatibility and broker. No unrelated old tests or repeat build of unchanged source.
+
+---
+
+# Dual-netif AP/STA owner checkpoint — 2026-11-26
+
+Continue from 6ba25177d679fb0fd5fa24596b173071d0810a23. Next bind exclusive network task, actual event barriers and bounded cleanup deadline, independent fresh DHCP event proof, bridge/transport lifecycle and trusted identity. Do not expose AP or credentials until applicable SDK buffer disposal and dependency gates reviewed. Target compile/build after relevant linked integration. Queue retained: initial phone setup, protected NVS hardware recovery/confidentiality, dynamic heap/stack measurement and MQTT compatibility/broker. One trial per window provisional; improve retry only after safe isolation. No old test repetition, automatic eFuse/OTA/heating, paid/private CI or main merge.
+
+---
+
+# AP/STA and runtime diagnostics checkpoint — 2026-11-26
+
+Continue from 9a39e7bb984fd7e73694c2ad241169e525dcb583. New isolated APSTA configuration and memory probe tests complete. Next exclusive dual-netif owner and start/stop/drain integration, actual fresh DHCP and AP channel migration, trusted per-device identity and SDK decrypted-buffer disposal, approved bounded transport and phone client. Hardware gates: real protected NVS power-cycle/error recovery and flash confidentiality, runtime internal heap/stack low-water and largest block through handshake/trial/cleanup. No automatic eFuse/OTA/heating or plaintext fallback. MQTT preliminary author code confirms incoming numeric indoor/outdoor callbacks, but exact deployed topic/QoS/retain/staleness must be pinned and broker candidate audited before implementation. No unrelated tests or target build until relevant linked change. Prior validated artifact 15087259482; PR #20 draft not merged.
+
+---
+
+# Security 2 target footprint complete — 2026-11-26
+
+Source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775, run 45755803953, verified artifact 15087259482. No repeat build of unchanged source. Next: secure identity/bootstrap and decrypted-buffer disposal review, bounded real transport and AP/STA/DHCP cleanup; real phone interoperability, runtime heap/stack peaks, connection and recovery. Account for 159952 bytes remaining in 1 MiB app before MQTT/web/OTA; do not change physical partition table or enable keys automatically. PR #17 and #20 remain draft; no main merge, hardware/OTA/heating or paid/private CI. Static footprint does not establish runtime readiness. Dependency and administrative gates remain.
+
+---
+
+# Security 2 footprint build in progress — 2026-11-26
+
+Inspect run 45755803953/job 139694014961 for source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775, verify real compile/link, full logs, artifacts and exact source manifests; compare static flash/DRAM to prior build. CI PR #20 not for merge. No repeated old tests. Runtime crypto, heap/stack peaks, identity, SDK decrypted-buffer disposal, actual AP/STA/DHCP and Android client still not verified. Keep activation blocked, no automatic eFuse/OTA/heating or paid/private CI.
+
+---
+
+# Security 2 context checkpoint — 2026-11-26
+
+Continue from 74156c8be6a72b99c8a76f0921aec780d6ea307d. Context ownership mock tests complete. Review applicable SDK dependency and decrypted-buffer disposal gates, trusted per-device salt/verifier provisioning and secure storage. Implement bounded single-owner transport and endpoint/bridge binding with real response completion, no plaintext fallback; actual AP/STA cleanup, DHCP and Android client. Audit isolated target build inputs, measure link footprint before activation and confirm real Security 2 interoperability. No old test repetition or automatic eFuse/flash/OTA/heating, no paid/private CI. Context is not wired into CMake or runtime and no real Security 2 handshake has been tested.
+
+---
+
+# Setup model integration checkpoint — 2026-11-26
+
+Continue from 85cbc2c5b0953059281d700040fddc8c3bbcc741. Offline bridge tests complete. Next review exact SDK Security2 session and buffer ownership, authenticated per-device identity, AP/STA trial implementation and completion/cleanup semantics. Bind actual adapter and protected store only after applicable dependency and memory review; ensure input/output lifetime, bounded queues/callbacks, fresh DHCP and timeout behavior. No old test repetition; no automatic eFuse, plaintext fallback, hardware/OTA/heating or paid/private CI. Target build after relevant integration.
+
+---
+
+# Transport lifecycle checkpoint — 2026-11-26
+
+Continue from c1a83001e86314be2f258fa3ea24df088e7142f2. New lifecycle host tests complete. Next integrate dispatcher, phone owner and lifecycle in an isolated adapter test, including timeout/stop propagation and actual clock after blocking operations; verify Security2 SDK session/buffer ownership and completion semantics, trusted per-device identity, Android client, AP/STA cleanup and DHCP, resource sizing and applicable advisories before exposure. Fixed 2 s budget provisional. No old test repetition, hardware, eFuse, OTA, heating or plaintext fallback. Target build only after relevant integration.
+
+---
+
+# Phone command dispatch checkpoint — 2026-11-26
+
+Continue from dcb64b90902749e4fe5e58982e70aa0ee1bbd20c. Dispatch tests complete; no unrelated test repetition. Next bounded transport owner lifecycle including final response/timeout before AP teardown, queue/rate limits, monotonic deadline and real AP/STA trial cleanup, trusted link/DHCP observation. Review official SDK Security2 session/buffer lifetime, per-device identity, Android client and memory/partition/advisory gates before actual network integration. No hardware/eFuse/OTA/heating or plaintext fallback. No new target build until relevant integration.
+
+---
+
+# Phone request framing checkpoint — 2026-11-26
+
+Parser and standalone host test verified at 8f742d170bb8664dacc96013f60da39c20e0bef7; no need to rerun unchanged tests. Next: design bounded reply/dispatch and transport lifecycle with explicit authenticated session ownership, rate limits, cleanup and close/response ordering. Verify SDK Security2 buffer ownership, per-device identity enrollment, Android client, actual AP/STA trial and fresh DHCP, partition/heap budget and applicable advisories before network integration. Parser does not authenticate or validate profile semantics. No plaintext fallback, automatic key/eFuse writes, hardware, OTA, heating or paid/private CI. Target build only after relevant integration.
+
+---
+
+# Phone setup transport checkpoint — 2026-11-26
+
+Target run 45740340743 independently verified; do not rebuild unchanged source. New phone session owner tests passed; review protected transport input/buffer lifecycle, Mbed TLS advisory applicability, per-device identity, Android client protocol and actual AP/STA ownership. Confirm flash/heap budget before adding transport. No plaintext fallback, automatic eFuse writes, hardware or unrelated test repetition.
+
+---
+
+# Target integration build pending — 2026-11-26
+
+Inspect run 45740340743/job 139643493540, all steps and full logs, exact source blobs, linked components, new partition map and independently downloaded artifact. Fix actual failure if necessary. Do not repeat old tests or flash. Continue protected phone enrollment and write integration only after applicable review; no automatic eFuse writes or plaintext fallback.
+
+---
+
+# Secure NVS startup integration checkpoint — 2026-11-26
+
+Build exact experimental integration for ESP32-C3 after applicable isolated CI audit. Verify binary size, linked dependency closure and partition offsets; no flash. Continue authenticated phone setup, trusted per-device identity and write/recovery integration. Default key -1 disables Wi-Fi; do not choose or generate hardware key without explicit approval and verified device state. No unrelated test repetition.
+
+---
+
+# Secure store candidate checkpoint — 2026-11-26
+
+New isolated store mock tests pass. Review SDK partition ownership and boot recovery; prove actual protected per-device key and separate partition layout, choose trusted first enrollment method, implement authenticated phone transport and integrate dedicated network task. Keep actual activation blocked without prerequisites. Target compile and linked dependency audit still pending. No eFuse generation, plaintext fallback, erase, deployment, or unrelated tests.
+
+---
+
+# Wi-Fi enrollment integration — 2026-11-26
+
+Station adapter target compile and artifact verification complete; no need to repeat this build solely for evidence. New standalone enrollment transaction host tests pass. Continue with reviewed secure storage backend and trusted per-device setup identity, no plaintext fallback or automatic eFuse writes; implement authenticated phone setup and real AP/STA trial, fresh DHCP proof and explicit persistence, reboot recovery and session zeroization. Bind BOOT and station adapter into dedicated network task without changing measurement logic. Verify real linked Wi-Fi dependency closure and target build only after functional integration. PR #17 remains draft; no flash/OTA/heating. Prove physical board storage state and actual network behavior before use. No unrelated test repetition.
+
+---
+
+# Wi-Fi target and enrollment gates — 2026-11-26
+
+Inspect run 45735143422 when terminal, verify full log, compiled adapter object, artifact and source blobs. Source 6a986225ed3bf2312ac7adf1524181e72f6c9fc0; later journal-only changes allowed. Do not claim runtime networking from unused adapter. Continue protected enrollment/storage design docs/WIFI_ENROLLMENT.md, implement authorized profile lifecycle and separate task; validate actual GPIO9, DHCP, event barriers, resource usage and loss recovery. Stock wifi_prov_mgr switches to FLASH; don't use as-is. No automatic eFuse writes or plaintext fallback. No repeated unrelated tests.
+
+---
+
+# Wi-Fi binding target build next — 2026-11-26
+
+Audit direct SDK component closure and compile exact candidate on ESP32-C3, verify artifacts. Adapter is uncalled so target link/size does not prove working network task. Then authenticated provisioning/enrollment and secure persistent profile interface, separate task integration, on-device tests for delayed vendor events, DHCP, GPIO9, resource use and driver recovery. No real credentials or AP until protected provisioning is ready. Do not enable irreversible eFuse features without approval. No repeat unrelated tests.
+
+---
+
+# Wi-Fi ESP-IDF binding next — 2026-11-26
+
+Bind tested owner to actual ESP-IDF transport with verifiable stop/drain and fresh DHCP lease; callback producer generation must be bound before posting, not guessed from current attempt. Validate GPIO9 and use 50 ms debounce/3 s hold after release. Protect credential storage before provisioning; do not enable AP or persist passwords yet. Target and bench tests pending.
+
+---
+
+# Wi-Fi adapter next — 2026-11-26
+
+Implement and test actual ESP-IDF event/task adapter, protected setup and credential storage design, BOOT and DHCP, stop/drain, generation and action-failure handling. Do not expose AP or persist real passwords until protected setup and storage verified. Target build and actual device testing pending. No repeat unrelated tests.
+
+---
+
 # Runtime NVS integrated; Wi-Fi next — 2026-11-26
 
 NVS source 6bd64d225c4c97884760ed0e25c4048c626b521b built and integrated in dev 759921b744300f304830292ca35060011c867de6. Next: autonomous Wi-Fi policy and tested ESP-IDF adapter, protected first boot/manual BOOT setup, DHCP default, indefinite nonblocking reconnect without automatic AP on disconnection, credential storage and provisioning review. No real credentials in sources or CI. No automatic NVS erase or irreversible eFuse changes; secure storage design must precede real credential use. Physical NVS/power-loss and concurrent tests outstanding. No hardware flash, OTA, heating, paid/private CI.

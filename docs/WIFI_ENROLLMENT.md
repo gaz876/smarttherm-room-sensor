@@ -1,0 +1,18 @@
+# Protected Wi-Fi enrollment and storage review (experimental design)
+
+Reviewed official ESP-IDF 5.5.6 provisioning guide, the exact SDK pin 880a203ae603d08a94d06aa01e0d6761958e5e9e, and the following source blobs:
+- components/wifi_provisioning/src/manager.c: 3f8139787f436cb71cb4ff20248b7b28e10a85f8
+- components/nvs_sec_provider/nvs_sec_provider.c: 8aaa545c0ce8053e3f919f963fb052e0bd6012cb
+- components/nvs_sec_provider/include/nvs_sec_provider.h: 3624553ef5f3c27644d9236bb30c4a7ab2e54313
+- components/nvs_flash/include/nvs_flash.h: b6e648452254d429e0decbec5fa144f119c910ad
+
+Findings: the stock manager explicitly switches to WIFI_STORAGE_FLASH before setting received station configuration and includes a debug helper that prints the SSID and a partially masked password. Its default behavior does not implement our RAM-only validation then explicit commit transaction. Do not link/use that manager as-is. The HMAC NVS provider key generation calls esp_efuse_write_key; do not invoke it, nor enable automatic boot-time key generation. A read-only security configuration path must be independently checked for use of an already provisioned key. Do not infer that a key exists on the actual board. No eFuse, flash encryption, secure boot or partition changes authorized or made.
+
+Provisional architecture (not implemented or final):
+- Protected first setup only after confirming a missing profile AND the device-specific enrollment secret is available. Otherwise fail closed and keep measurements running. BOOT long hold requests a bounded setup window, not open AP or credential erase. Wrong router password or connection loss never starts AP.
+- Prefer Espressif protocomm Security 2 (SRP6a + AES-GCM) rather than the stock Wi-Fi manager. A unique per-device password, salt/verifier, and protected SoftAP key must be supplied by a locally trusted enrollment process (e.g. one-time physical USB enrollment or device label). No MAC-derived password, common compiled secret or debug output. Exact Android/phone workflow and secret delivery on the displayless board remain to be approved/verified. No custom cryptography.
+- Keep candidate credentials in RAM only; validate lengths/auth policy and actual associated station plus fresh DHCP lease; commit only after successful validation, explicit authenticated request and protected storage readiness. A failed setup preserves previous verified profile. No assumption of atomic rollback after an ambiguous flash write: report failure, verify readback, define recovery after reboot; do not erase whole NVS.
+- Separate credential namespace/partition from nonsecret measurement record. A future secure backend must prove encryption key readiness and use explicit read-only key derivation with already provisioned hardware key; no automatic generation or plaintext fallback. The current experimental 4 MB factory layout and unencrypted measurement NVS stay unchanged. Real credential persistence is blocked until actual board security state, enrollment/recovery and partition compatibility are checked. A RAM-only adapter can be compiled/tested without real secrets.
+- Review exact protocomm dependencies, session timeouts, replay/failed-auth handling, zeroization, logs, old-profile restore, SDK event isolation and coexistence of AP+STA before enabling setup. Use only synthetic credentials in public CI. Do not connect to heating equipment.
+
+References: https://docs.espressif.com/projects/esp-idf/en/v5.5.6/esp32c3/api-reference/provisioning/wifi_provisioning.html ; https://docs.espressif.com/projects/esp-idf/en/v5.5.6/esp32c3/security/security-features-enablement-workflows.html .
