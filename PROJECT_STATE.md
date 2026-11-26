@@ -1,3 +1,11 @@
+# 2026-11-27 — Public Git history audit completed
+
+- User supplied repository Actions settings screenshot: full SHA pin required, all external contributors require approval, default token read-only, Actions PR creation/approval disabled, all Actions allowed. User reports Actions secrets/variables and environments empty. Screenshot repository identity relies on user context; organization-wide settings not independently accessible. Retain full SHA requirement; no settings changed.
+- Standalone draft PR #25, commit 25df1d21451966819e80289ea6344feddbcb1b13, run 45903480435, job 140194581236: Gitleaks 8.30.1 official archive SHA-256 verified, full mirror non-shallow, git fsck passed, 60 advertised refs, 280 reachable commits, refs inventory SHA-256 12b69a5865887ed34adbfc504605b7e7007487c319f1306857161ec8350dd64c; scanner exit 0, findings 0, HISTORY_SCAN_OK. Job token Metadata: read. No report published. Scope is reachable public history at scan time; not deleted/unadvertised refs, every possible secret format, or private repos. Candidate scanned at 3c73e6795f8839997256c5914632a6a60b20820c; protected 0043c1e9498f22228db950144c0f6665ec83cf23.
+- Next: qualify agreed ESP-IDF 6.1.1 in separate single-purpose isolated CI; retain prior firmware source 4616624dd00abe44f0b2dabce2b44b657c85383d and SDK 5.5.6 baseline. Only public synthetic tests, no secrets, deployment, activation or protected merge. Verify pinned image and SDK source, actual probe compilation, target and host tests, memory footprint. Hardware/browser testing and administrative visibility limitations remain.
+
+---
+
 # 2026-11-27 — Reconciliation after experimental development audit
 
 - PR #23 source checkpoint b9f7483691d96a36a6ffbe77ce5c7d713b6600bd; firmware source 4616624dd00abe44f0b2dabce2b44b657c85383d. Protected PR #17 remains 0043c1e9498f22228db950144c0f6665ec83cf23. PR #20 CI checkpoint 50256e555a09faba60d5524d523779ab006bfe99 closed without merge; all history retained. No firmware change.
