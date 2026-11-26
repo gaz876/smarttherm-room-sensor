@@ -1,3 +1,9 @@
+# Setup model integration checkpoint — 2026-11-26
+
+Continue from 85cbc2c5b0953059281d700040fddc8c3bbcc741. Offline bridge tests complete. Next review exact SDK Security2 session and buffer ownership, authenticated per-device identity, AP/STA trial implementation and completion/cleanup semantics. Bind actual adapter and protected store only after applicable dependency and memory review; ensure input/output lifetime, bounded queues/callbacks, fresh DHCP and timeout behavior. No old test repetition; no automatic eFuse, plaintext fallback, hardware/OTA/heating or paid/private CI. Target build after relevant integration.
+
+---
+
 # Transport lifecycle checkpoint — 2026-11-26
 
 Continue from c1a83001e86314be2f258fa3ea24df088e7142f2. New lifecycle host tests complete. Next integrate dispatcher, phone owner and lifecycle in an isolated adapter test, including timeout/stop propagation and actual clock after blocking operations; verify Security2 SDK session/buffer ownership and completion semantics, trusted per-device identity, Android client, AP/STA cleanup and DHCP, resource sizing and applicable advisories before exposure. Fixed 2 s budget provisional. No old test repetition, hardware, eFuse, OTA, heating or plaintext fallback. Target build only after relevant integration.
