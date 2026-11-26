@@ -1,3 +1,11 @@
+# 2026-11-27 — Approved offline 2 MiB partition validation
+
+- User explicitly approved experiment only: relocated 2 MiB factory at 0x120000, preserve NVS/PHY/room_wifi offsets, no device writes or OTA. Draft PR #28, ci/partition-2m-20261127, workflow b66009136bb4481e69438fa11179eda85e996b41; run 45910641021, status in_progress, conclusion pending. Do not duplicate. Inspect actual SDK generation, build, symbols, size, flash manifest and all checks before claiming PASS.
+- Pinned public source 75df361f733973bd7d58e7bd856af96da28bdbb6; firmware inputs identical to HTTPS footprint experiment. Temporary container CSV and CMake changes only, not applied to candidate or main. Same qualified SDK/image/GCC, offline container and minimal token. SDK generator validates 4 MiB old/new tables and binary roundtrip, data partition equality, built partition binary equality and expected app offset in generated flash manifest. Inert HTTPS linked, normal size checks retained, no binary upload/flash.
+- Candidate app range 0x120000..0x31ffff, old factory area untouched in design. Expected free app space about 1043760 bytes, to be measured. Hardware flash capacity, boot and rollback behavior remain unverified. No production layout or OTA authorization. After result, review logs and decide whether to incorporate validated experimental layout into a separate source branch.
+
+---
+
 # 2026-11-27 — HTTPS footprint measured; partition does not fit
 
 - PR #27 workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8, run 45906704171, job 140205056464 succeeded as a measurement, NOT a deployable build. Actual SDK build exit 2, explicit factory overflow 0x12d0, HTTPS_PARTITION_OVERFLOW_CONFIRMED and HTTPS_FOOTPRINT_MEASURED. No warning lines, token Metadata: read, zero uploaded artifacts. Pinned source 1d005d634705baa187af55fb21f7b548c642da93; no runtime HTTPS calls, partition change or flash.
