@@ -5,13 +5,14 @@
 
 /* Trusted local provider only; NOT a phone/network API. No default provider,
  * no startup call, no identity generation. prepare supplies one ephemeral AP
- * configuration and a borrowed Security2 identity that must outlive teardown.
- * The link wipes its temporary AP configuration after the start attempt.
+ * configuration and inline Security2 identity from trusted storage.
+ * SDK context copies identity; link wipes temporary window after start.
  * No packet/listener API is exposed by this experimental binding. */
 typedef struct {
     uint8_t ssid[32], key[63];
     size_t ssid_len, key_len;
-    const protocomm_security2_params_t *identity;
+    char salt[ROOM_SEC2_SALT_MAX], verifier[ROOM_SEC2_VERIFIER_SIZE];
+    uint16_t salt_len, verifier_len;
     uint32_t sdk_id;
 } room_wifi_apsta_window;
 typedef struct {

@@ -5,27 +5,40 @@
 #include <stddef.h>
 #include <protocomm.h>
 #include <protocomm_security2.h>
+#include "room_wifi_enrollment.h"
 
 /* Experimental SDK context only. No HTTP, Wi-Fi, or device credentials.
- * Single owner, initialized to zero. Identity material and handler context
- * are borrowed from a trusted owner and must outlive the context. Never
+ * Single owner, initialized to zero, never moved while live. Identity is
+ * copied into owned storage; handler context is borrowed until destroy. Never
  * attach a transport until its independent security review is complete. */
+enum { ROOM_SEC2_SALT_MAX=64, ROOM_SEC2_VERIFIER_SIZE=384 };
 typedef struct {
+    char salt[ROOM_SEC2_SALT_MAX], verifier[ROOM_SEC2_VERIFIER_SIZE];
+    protocomm_security2_params_t identity;
     protocomm_t *pc;
     uint32_t session;
     bool used, failed;
 } room_sec2_context;
 
+static inline void room_sec2_clear_identity(room_sec2_context *c) {
+    enroll_wipe(c->salt,sizeof(c->salt));
+    enroll_wipe(c->verifier,sizeof(c->verifier));
+    c->identity=(protocomm_security2_params_t){0};
+}
 static inline bool room_sec2_create(room_sec2_context *c,
     const protocomm_security2_params_t *identity, protocomm_req_handler_t handler, void *ctx) {
     if (!c || c->pc || c->failed || !identity || !handler || !identity->salt ||
-        identity->salt_len<8 || identity->salt_len>64 || !identity->verifier ||
-        identity->verifier_len!=384) return false;
+        identity->salt_len<8 || identity->salt_len>ROOM_SEC2_SALT_MAX || !identity->verifier ||
+        identity->verifier_len!=ROOM_SEC2_VERIFIER_SIZE) return false;
     protocomm_t *pc=protocomm_new();
     if (!pc) return false;
-    if (protocomm_set_security(pc,"room-session",&protocomm_security2,identity)!=ESP_OK ||
+    memcpy(c->salt,identity->salt,identity->salt_len);
+    memcpy(c->verifier,identity->verifier,identity->verifier_len);
+    c->identity=(protocomm_security2_params_t){.salt=c->salt,.salt_len=identity->salt_len,
+        .verifier=c->verifier,.verifier_len=identity->verifier_len};
+    if (protocomm_set_security(pc,"room-session",&protocomm_security2,&c->identity)!=ESP_OK ||
         protocomm_add_endpoint(pc,"room-command",handler,ctx)!=ESP_OK) {
-        protocomm_delete(pc); return false;
+        protocomm_delete(pc); room_sec2_clear_identity(c); return false;
     }
     c->pc=pc; c->used=false; c->session=0; return true;
 }
@@ -47,6 +60,7 @@ static inline bool room_sec2_destroy(room_sec2_context *c,bool drained) {
     if (c->session && protocomm_close_session(c->pc,c->session)!=ESP_OK) {
         c->failed=true; return false;
     }
-    protocomm_delete(c->pc); c->pc=NULL; c->session=0; c->used=false; return true;
+    protocomm_delete(c->pc); c->pc=NULL; c->session=0; c->used=false;
+    room_sec2_clear_identity(c); return true;
 }
 #endif

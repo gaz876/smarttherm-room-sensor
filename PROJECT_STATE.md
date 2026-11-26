@@ -1,3 +1,11 @@
+# 2026-11-26 — Owned Security2 identity lifecycle candidate
+
+- Security2 context owns salt (8–64 bytes) and verifier (384 bytes), including persistent SDK descriptor. Never move live context. Wipe on confirmed SDK deletion, retain on ambiguous session open/close. Provider fills inline bytes; temporary window wiped even on prepare failure. No actual identity provider, generation or listener.
+- Context tests verify copy independent of original buffers, wipe on creation rejection and successful destroy, and retention on ambiguous failure; combined tests check owned identity and wipe. Candidate not yet built/tested. Prior f56fb72459f40b20f2bef2c306bb3f3207dc2eee passed 27 GCC ASan/UBSan scenarios and target build in 45781923320; artifact 15099405187, CI digest cf35a61e410ad4b6733f647211cdb2cf9cb5a12c2cacf5cd96a8816fe18a9f3d. Clang absent; independent archive verification pending.
+- Espressif protocomm docs specify salt and verifier pointer fields; exact pinned SDK source and decrypted-buffer lifecycle still require review. Added memory must be measured on hardware. No startup activation, eFuse writes, protected merge, or deployment.
+
+---
+
 # 2026-11-26 — Verified-save handoff candidate
 
 - APSTA phone policy retains a per-boot committed generation only after authenticated enrollment returns ENROLL_SAVED (write and matching readback). Link snapshots the prior receipt before opening a window. On complete transport/radio teardown only, it reports new verified commit, no save, or uncertain storage. The owner promotes missing profile to valid only for a verified commit, reloads protected storage before STA, and quarantines an uncertain write/readback or invalid reload. Loss of the final response cannot undo verified persistence. No new packet or listener API in production.

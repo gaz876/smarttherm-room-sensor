@@ -37,14 +37,16 @@ static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool phy
     }
     phone_profile_state phone_profile=profile==ROOM_WIFI_PROFILE_MISSING?PHONE_PROFILE_MISSING:PHONE_PROFILE_VALID;
     room_wifi_apsta_window p={0};
-    bool ok=a.provider.prepare(a.provider.ctx,&p) && ready(NULL) &&
+    bool prepared=a.provider.prepare(a.provider.ctx,&p);
+    const protocomm_security2_params_t identity={.salt=p.salt,.salt_len=p.salt_len,
+        .verifier=p.verifier,.verifier_len=p.verifier_len};
+    bool ok=prepared && ready(NULL) &&
         now_ms()<deadline && p.key_len>=16 &&
         enroll_profile_valid(p.ssid,p.ssid_len,p.key,p.key_len) &&
-        p.identity && p.identity->salt && p.identity->salt_len>=8 &&
-        p.identity->salt_len<=64 && p.identity->verifier &&
-        p.identity->verifier_len==384 && p.sdk_id && p.sdk_id!=UINT32_MAX &&
+        p.salt_len>=8 && p.salt_len<=sizeof(p.salt) &&
+        p.verifier_len==sizeof(p.verifier) && p.sdk_id && p.sdk_id!=UINT32_MAX &&
         room_apsta_task_open(&a.task,phone_profile,physical_boot,true,&a.store,
-            p.ssid,p.ssid_len,p.key,p.key_len,p.identity,p.sdk_id);
+            p.ssid,p.ssid_len,p.key,p.key_len,&identity,p.sdk_id);
     enroll_wipe(&p,sizeof(p));
     if (ok && a.task.session.bridge.phone.deadline>deadline)
         a.task.session.bridge.phone.deadline=deadline;
