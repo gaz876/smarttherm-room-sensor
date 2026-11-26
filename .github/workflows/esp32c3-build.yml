@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=5cffd1dbb4592bd1bcb480c035bdc6e217135ff1
+          source_sha=819ec2594c153860ec3b84a31749c7236c4eed87
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -79,6 +79,11 @@ jobs:
             for cc in gcc clang; do
               if ! command -v "$cc" >/dev/null; then echo "HOST_COMPILER_UNAVAILABLE $cc"; continue; fi
               "$cc" --version | head -n 1
+              for t in owner handoff; do
+                "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc "tests/test_room_wifi_$t.c" -o "/tmp/room_host/$cc-wifi-$t"
+                timeout 15s "/tmp/room_host/$cc-wifi-$t"
+                echo "HOST_WIFI_OK $cc $t"
+              done
               for t in session events task; do
                 extra=()
                 case "$t" in
