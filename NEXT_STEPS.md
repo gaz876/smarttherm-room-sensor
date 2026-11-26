@@ -1,3 +1,12 @@
+# 2026-11-27 — ESP-IDF 6.1.1 qualification PASS
+
+- PR #26 workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973, job 140197424290 completed success. Exact source 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2, SDK 051e4c4eb20346e043cdd47bc388fde75ff8af63, image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c, RISC-V GCC 15.2.0. HTTPS_SDK_PROBE_OK, ESP32C3_BUILD_OK, all 51 GCC ASan/UBSan mock scenarios passed; Clang unavailable; no warning lines in job log. Token Metadata: read.
+- Firmware bin 934224 bytes, 114352 bytes free in 1 MiB app partition (10.9%); +32240 bytes over 5.5.6 baseline 901984. Static DRAM 112812 vs 122030 bytes (-9218); remaining static budget 208484 vs 199266, not measured runtime heap. Compile-only HTTPS probe bin 150016 bytes; does not establish actual HTTPS server footprint or runtime behavior.
+- Artifact 15157661167, 5036778 bytes, independently downloaded: ZIP SHA-256 1d1f9f7e9abb961ea5ef918c35a377732a660cf28567e0321c799a9df3fa5153 matches GitHub. All 21 entries CRC-valid; 20 SHA256SUMS and 5 binary checksums match; provenance and 51 PASS markers verified; no common credential signature hits in archive. Security2 only, HMAC key ID -1, no automatic security provisioning config. Retention 14 days. No flash/OTA.
+- SDK 6.1.1 qualifies for subsequent isolated development, not production activation. Preserve 5.5.6 baseline. Close single-purpose PR #26 without merge; next stage: quantify actual HTTPS component footprint with an inert link probe and assess partition/RAM headroom, then design trusted local browser backend and tests. Real AP-only isolation, bounded worker shutdown, certificate provisioning, Security2 browser interoperability, hardware DHCP/NVS, MQTT remain unverified. No partition change, production configuration change or protected merge authorized by this qualification.
+
+---
+
 # 2026-11-27 — ESP-IDF 6.1.1 qualification in progress
 
 - Draft PR #26, ci/idf611-qualification-20261127, workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973 in progress at capture. Do not duplicate. Read final job logs and independently verify artifact before claiming success.
