@@ -6,4 +6,4 @@ Startup loads read-only. Missing/invalid/unsupported/I/O status is explicit; fal
 
 I2C recovery reapplies the loaded interval and correction. The measurement owner publishes a copy under a short FreeRTOS critical section; readers call room_runtime_snapshot in task context, with freshness calculated at read time and settings status available. No I2C or NVS calls under the lock. Future transport must check both sample validity and configuration status; invalid/unsupported/I/O configuration fallback is not cleared for heating use.
 
-Host tests use a fake store, not real flash. New target build and hardware validation pending. No Wi-Fi, MQTT, OTA, heating or production changes.
+Host tests use a fake store and actual app source against a mock SDK, not real flash or a concurrent scheduler. Dedicated runner: sh tests/run_settings_host.sh. Target build and archive verified in run 45729696843; hardware validation, real task concurrency and user-facing save/reset path remain pending. No Wi-Fi, MQTT, OTA, heating or production changes.

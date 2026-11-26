@@ -1,3 +1,9 @@
+# Experimental NVS settings — 2026-11-26
+
+Target build and archived evidence complete for be95be3d3676c24a077a443bdf4c01c9f7309980; integrate reviewed PR #12 into dev if all later changes are tests/docs only, verify build-input blobs unchanged. Next: protected Wi-Fi provisioning and persistent network settings with credential handling review (current measurement NVS unencrypted; no credentials yet), nonblocking reconnect and manual BOOT setup; implement single-owner runtime measurement configuration command path and explicit save/reset/readback before applying new settings; connect synchronized snapshot to authorized future consumers and reject invalid/stale or unsafe configuration fallback. Bench verify real NVS power-loss/restart, fault handling, actual I2C recovery and concurrent access; no live heating/flash/OTA without required clearance. Prior dependency/advisory audit before stable release. Continue only new relevant tests. No private/paid CI.
+
+---
+
 # ESP32-C3 I2C recovery target build verified — 2026-11-26
 
 Target compilation and artifact verification complete for 598f896a1d3e0ca3d66b0b2674f9eee31528214e. Integrate reviewed PR #11 into dev; verify resulting source blobs unchanged. Next: versioned validated NVS measurement settings with persistent correction/interval, explicit reset, synchronized freshness, then Wi-Fi provisioning and MQTT protocol compatibility. Retain previous tests; run new relevant tests only. Complete full applicable dependency/SBOM review before stable release and bench verify GPIO/pull-ups and physical I2C recovery before use. No flash, heating control, OTA or paid CI.
