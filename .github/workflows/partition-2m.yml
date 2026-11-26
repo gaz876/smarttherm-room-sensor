@@ -1,0 +1,104 @@
+name: ESP-IDF 6.1.1 experimental 2 MiB partition
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/partition-2m.yml']
+permissions: {}
+concurrency:
+  group: partition-2m-20261127
+  cancel-in-progress: true
+jobs:
+  footprint:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/partition-2m-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Validate relocated factory partition and inert HTTPS linkage
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          source_sha=75df361f733973bd7d58e7bd856af96da28bdbb6
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          cid=""
+          trap 'if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null; fi; rm -rf "$work"' EXIT
+          git init -q "$work/repo"
+          git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
+          test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
+          mkdir "$work/input"
+          git -C "$work/repo" archive "$source_sha" CMakeLists.txt main src sdkconfig.defaults | tar -x -C "$work/input"
+          git -C "$work/repo" ls-tree -r "$source_sha" -- CMakeLists.txt main src sdkconfig.defaults
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          cid="$(docker create --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/room_sensor
+            cp -R --no-preserve=ownership /input/. /tmp/room_sensor/
+            cd /tmp/room_sensor
+            sha256sum main/partitions.csv sdkconfig.defaults
+            # Approved experiment: only a disposable container copy is modified.
+            cp main/partitions.csv /tmp/original-partitions.csv
+            grep -qx "factory,app,factory,0x10000,1M," /tmp/original-partitions.csv
+            sed -i "s/^factory,app,factory,0x10000,1M,$/factory,app,factory,0x120000,2M,/" main/partitions.csv
+            sed -i "s/^# Experimental only; preserve existing NVS, PHY and factory offsets\.$/# Experimental only; preserve NVS and PHY; relocated factory./" main/partitions.csv
+            cat main/partitions.csv
+            generator="$IDF_PATH/components/partition_table/gen_esp32part.py"
+            python "$generator" --flash-size 4MB /tmp/original-partitions.csv /tmp/old-table.bin
+            python "$generator" --flash-size 4MB main/partitions.csv /tmp/new-table.bin
+            python "$generator" --flash-size 4MB /tmp/old-table.bin /tmp/old-roundtrip.csv
+            python "$generator" --flash-size 4MB /tmp/new-table.bin /tmp/new-roundtrip.csv
+            cat /tmp/new-roundtrip.csv
+            python -c "import csv; rows=lambda p:{r[0].strip():tuple(v.strip() for v in r[1:]) for r in csv.reader(open(p)) if r and not r[0].lstrip().startswith(chr(35))}; a=rows(\"/tmp/old-roundtrip.csv\"); b=rows(\"/tmp/new-roundtrip.csv\"); assert set(a)==set(b)=={\"nvs\",\"phy_init\",\"room_wifi\",\"factory\"}; assert all(a[k]==b[k] for k in a if k!=\"factory\"); assert a[\"factory\"][:2]==b[\"factory\"][:2]; print(\"DATA_PARTITIONS_UNCHANGED\")"
+            echo PARTITION_GENERATOR_OK
+            # Modify only the temporary CMake copy. No runtime calls or source edits.
+            printf "\nidf_component_get_property(https_lib esp_https_server COMPONENT_LIB)\ntarget_link_libraries(\${COMPONENT_LIB} INTERFACE \${https_lib} \"-Wl,-u,httpd_ssl_start\" \"-Wl,-u,httpd_ssl_stop\" \"-Wl,-u,httpd_register_uri_handler\" \"-Wl,-u,httpd_req_recv\" \"-Wl,-u,httpd_resp_send\" \"-Wl,-u,httpd_resp_set_type\" \"-Wl,-u,httpd_resp_set_hdr\" \"-Wl,-u,httpd_sess_trigger_close\")\n" >> main/CMakeLists.txt
+            # ESP-IDF requires explicit dependency so the HTTPS component is included.
+            sed -i "s/nvs_sec_provider protocomm)/nvs_sec_provider protocomm esp_https_server)/" main/CMakeLists.txt
+            grep -q "protocomm esp_https_server)" main/CMakeLists.txt
+            tail -n 4 main/CMakeLists.txt
+            idf.py set-target esp32c3
+            set +e
+            idf.py build > /tmp/build.log 2>&1
+            rc=$?
+            set -e
+            cat /tmp/build.log
+            test -s build/room_sensor.elf
+            test -s build/room_sensor.bin
+            test -s build/partition_table/partition-table.bin
+            cmp build/partition_table/partition-table.bin /tmp/new-table.bin
+            python "$generator" --flash-size 4MB build/partition_table/partition-table.bin /tmp/built-roundtrip.csv
+            cmp /tmp/built-roundtrip.csv /tmp/new-roundtrip.csv
+            python -c "import json; j=json.load(open(\"build/flasher_args.json\")); f={int(k,0):v for k,v in j[\"flash_files\"].items()}; assert j[\"flash_settings\"][\"flash_size\"]==\"4MB\"; assert f[0x120000].endswith(\"room_sensor.bin\"); assert 0x10000 not in f and 0x110000 not in f; print(\"APP_OFFSET_OK=0x120000\")"
+            echo GENERATED_TABLE_MATCH_OK
+            cmp sdkconfig.defaults /input/sdkconfig.defaults
+            grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
+            grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y" sdkconfig
+            if grep -Eq "^CONFIG_(ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_[01]|NVS_ENCRYPTION|SECURE_FLASH_ENC_ENABLED|SECURE_BOOT|SECURE_BOOT_V2_ENABLED)=y$" sdkconfig; then exit 1; fi
+            riscv32-esp-elf-nm build/room_sensor.elf > /tmp/symbols.txt
+            for sym in httpd_ssl_start httpd_ssl_stop httpd_register_uri_handler httpd_req_recv httpd_resp_send httpd_resp_set_type httpd_resp_set_hdr httpd_sess_trigger_close protocomm_security2; do
+              grep -E "[[:space:]]$sym$" /tmp/symbols.txt
+            done
+            idf.py size
+            idf.py size-components
+            bytes="$(stat -c %s build/room_sensor.bin)"
+            printf "HTTPS_FOOTPRINT_BYTES=%s\nHTTPS_DELTA_BYTES=%s\nFACTORY_HEADROOM_BYTES=%s\n" "$bytes" "$((bytes-934224))" "$((2097152-bytes))"
+            printf "BUILD_EXIT=%s\n" "$rc"
+            test "$rc" -eq 0
+            test "$bytes" -le 2097152
+            echo HTTPS_PARTITION_2M_BUILD_OK
+            sha256sum /tmp/old-table.bin /tmp/new-table.bin build/partition_table/partition-table.bin
+            echo PARTITION_EXPERIMENT_OK
+            # No binary upload, flashing, listener start, or partition bypass.
+          ')"
+          docker start -a "$cid"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$cid")" = 0
