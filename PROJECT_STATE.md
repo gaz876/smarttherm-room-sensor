@@ -1,3 +1,11 @@
+# 2026-11-26 — Verified-save handoff candidate
+
+- APSTA phone policy retains a per-boot committed generation only after authenticated enrollment returns ENROLL_SAVED (write and matching readback). Link snapshots the prior receipt before opening a window. On complete transport/radio teardown only, it reports new verified commit, no save, or uncertain storage. The owner promotes missing profile to valid only for a verified commit, reloads protected storage before STA, and quarantines an uncertain write/readback or invalid reload. Loss of the final response cannot undo verified persistence. No new packet or listener API in production.
+- Test-only fixture includes the actual private link translation unit; five new combined scenarios exercise successful first save, lost final response while borrowed buffer remains pending, write failure, readback failure, and reload failure. The cryptographic SDK, radio, and protected store are mocks. New candidate not built/tested yet. Prior 46aeda41abdf79817156efe4ed8ed2cbad383176 passed 22 GCC ASan/UBSan scenarios and target build in 45781113824, artifact 15098671233, CI digest 2978a5539e5d417edd73d20df911ef37e54ad5efce82fc0b22d7cb3b9a7695c4. Clang absent, independent archive verification pending.
+- Remaining: identity/provider lifetime, real phone transport and sender drain, SDK decrypted-buffer review, startup integration and physical testing. No activation, eFuse changes, deployment, protected-branch merge or Cloudflare changes.
+
+---
+
 # 2026-11-26 — Protected missing-profile first boot candidate
 
 - Added optional missing-profile initialization in the single network owner and actual APSTA link. It independently reads the already-initialized protected store before initializing and again before opening a missing-profile setup window. Valid, corrupt, unavailable records never authorize automatic setup. Exactly one automatic opportunity on the first owner step; readiness arriving later cannot open AP until a physical BOOT gesture. The link passes missing/valid profile and physical authorization explicitly to the existing session policy. The ordinary valid-profile STA startup remains unchanged, with no provider or live listener.

@@ -69,8 +69,26 @@ static bool stop(void *ctx) {
     if (!w.cleanup_deadline) w.cleanup_deadline=wifi_deadline(now,5000u);
     if (now>=w.cleanup_deadline) { w.fatal=true; return false; }
     if (w.apsta) {
-        if (!w.setup_io.stop(w.setup_io.ctx)) return false;
-        w.apsta=false; w.cleanup_deadline=0; return true;
+        room_wifi_setup_result result=ROOM_WIFI_SETUP_NO_SAVE;
+        if (!w.setup_io.stop(w.setup_io.ctx,&result)) return false;
+        w.apsta=false; w.cleanup_deadline=0;
+        /* Completion is reconciled only after radio and transport teardown.
+         * A verified write survives loss of the final response or timeout.
+         * No saved profile is inferred merely from closing the setup window. */
+        if (result==ROOM_WIFI_SETUP_COMMITTED) {
+            w.owner.pending_setup=false;
+            w.owner.policy.profile=ROOM_WIFI_PROFILE_VALID;
+            w.owner.policy.state=ROOM_WIFI_RETRY;
+            w.owner.policy.retry_ms=1000u;
+            w.owner.policy.deadline=now_ms();
+        } else if (result!=ROOM_WIFI_SETUP_NO_SAVE) {
+            w.owner.pending_setup=false;
+            w.owner.policy.profile=ROOM_WIFI_PROFILE_ERROR;
+            w.owner.policy.state=ROOM_WIFI_OFF;
+            enroll_wipe(&w.config,sizeof(w.config));
+            w.fatal=true;
+        }
+        return true;
     }
     if (w.clean==CLEAN_NONE) {
         if (w.attempted && esp_wifi_stop()!=ESP_OK) return false;

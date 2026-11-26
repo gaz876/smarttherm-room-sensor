@@ -18,6 +18,9 @@ static int owner_id,other_id;
 static TaskHandle_t current=&owner_id;
 static fake storage;
 static room_secure_status storage_status=ROOM_SEC_VALID;
+static bool fail_write,fail_readback;
+bool fixture_packet(bool,const uint8_t *,size_t,const uint8_t **,size_t *);
+bool fixture_sent(bool);
 static bool network_inited,loop_inited;
 const char ip_base[]="ip",wifi_base[]="wifi";
 static struct { esp_event_base_t base; esp_event_handler_t fn; void *ctx; int32_t id; } callbacks[4];
@@ -105,7 +108,17 @@ int esp_wifi_clear_default_wifi_driver_and_handlers(void *v){struct esp_netif *p
 void esp_netif_destroy(esp_netif_t *p){assert(pre&&!posted&&!p->attached&&!p->up&&p->allocated);p->allocated=false;}
 int esp_wifi_deinit(void){assert(driver&&!started&&!posted&&!ap.allocated&&!sta.allocated&&pre);driver=false;++deinits;return ESP_OK;}
 
-room_enroll_store room_secure_store(void){return (room_enroll_store){&storage,ready,write_record,read_record};}
+static bool protected_ready(void *v){return ready(v)&&(storage_status==ROOM_SEC_VALID||storage_status==ROOM_SEC_MISSING);}
+static bool protected_write(void *v,const room_enroll_profile *p){
+    bool ok=write_record(v,p);
+    storage_status=fail_write?ROOM_SEC_ERROR:ROOM_SEC_VALID;
+    return ok&&!fail_write;
+}
+static bool protected_read(void *v,room_enroll_profile *p){
+    if(fail_readback){storage_status=ROOM_SEC_ERROR;return false;}
+    return read_record(v,p);
+}
+room_enroll_store room_secure_store(void){return (room_enroll_store){&storage,protected_ready,protected_write,protected_read};}
 room_secure_status room_secure_load(room_enroll_profile *p){assert(!driver&&!posted);++loads;*p=storage_status==ROOM_SEC_VALID?storage.saved:(room_enroll_profile){0};return storage_status;}
 static bool provider_ready(void *v){assert(v==&storage);return provider_ok;}
 static bool provider_prepare(void *v,room_wifi_apsta_window *p){
@@ -118,6 +131,51 @@ static bool provider_prepare(void *v,room_wifi_apsta_window *p){
 }
 static bool tick(uint64_t now){ms=now;return room_wifi_idf_step(NULL);}
 static void online(uint64_t now){linked=true;sta.up=true;sta.ip=1;assert(tick(now));}
+static void got_ip(void){
+    ip_event_got_ip_t got={.esp_netif=&sta,.ip_info={.ip={.addr=sta.ip}}};
+    for(unsigned i=0;i<registered;i++)if(callbacks[i].base==IP_EVENT)
+        callbacks[i].fn(callbacks[i].ctx,IP_EVENT,IP_EVENT_STA_GOT_IP,&got);
+}
+static int first_save(const char *scenario){
+    room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};
+    storage_status=ROOM_SEC_MISSING;
+    assert(room_wifi_apsta_link_init_missing(p)&&!tick(0)&&ap_starts==1&&!sta_starts);
+    const uint8_t *out=NULL;size_t n=0;
+    uint8_t hs[]={1},stage[29]={1,ROOM_SETUP_STAGE,1,8,'x','a','b','c','d','e','f','g','h'},
+        save[26]={1,ROOM_SETUP_SAVE,0,0,0,0,0,0,0,1};
+    assert(fixture_packet(true,hs,sizeof(hs),&out,&n)&&fixture_sent(true));
+    ms=1;assert(fixture_packet(false,stage,sizeof(stage),&out,&n)&&fixture_sent(true));
+    assert(!tick(2)&&posted&&!connects);deliver();
+    assert(!tick(3)&&connects==1&&!posted);
+    linked=true;sta.up=true;sta.ip=42;got_ip();assert(!tick(4));
+    fail_write=!strcmp(scenario,"save_write_error");
+    fail_readback=!strcmp(scenario,"save_read_error");
+    ms=101;assert(fixture_packet(false,save,sizeof(save),&out,&n)&&n==27);
+    assert(storage.writes==1&&out[1]==(fail_write||fail_readback?ROOM_REPLY_UNCERTAIN:ROOM_REPLY_SAVED));
+    assert(!sta_starts&&driver&&started&&mode==WIFI_MODE_APSTA);
+    uint64_t close_at=102;
+    if(!strcmp(scenario,"save_lost")){
+        disconnect_event();
+        assert(!tick(102)&&!posted&&!stops&&driver&&started);
+        assert(!fixture_sent(false));
+        close_at=1102;
+    }else{
+        assert(fixture_sent(true));
+    }
+    assert(!tick(close_at)&&posted&&stops==1&&!started&&!sta_starts);
+    deliver();assert(!tick(close_at+1000)&&posted&&!driver&&!sta_starts);
+    deliver();
+    if(!strcmp(scenario,"save_reload_error"))storage_status=ROOM_SEC_ERROR;
+    assert(!tick(close_at+2000));
+    if(fail_write||fail_readback||!strcmp(scenario,"save_reload_error")){
+        assert(!driver&&!sta_starts&&!posted);
+        assert(!tick(close_at+10000)&&ap_starts==1&&!sta_starts&&storage.writes==1);
+        puts("PASS first save uncertain or invalid reload blocks STA");return 0;
+    }
+    assert(driver&&started&&mode==WIFI_MODE_STA&&sta_starts==1&&loads==3&&connects==2&&!ap.allocated);
+    online(close_at+2050);assert(storage.saved.ssid_len==1&&storage.saved.ssid[0]=='x'&&storage.writes==1);
+    puts("PASS verified first save, drained reply/radio, reload and STA");return 0;
+}
 static int first_boot(const char *scenario) {
     room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};
     if(!strcmp(scenario,"first_error"))storage_status=ROOM_SEC_ERROR;
@@ -133,7 +191,7 @@ static int first_boot(const char *scenario) {
     if(!strcmp(scenario,"first_changed"))storage_status=ROOM_SEC_ERROR;
     assert(!tick(0)&&!sta_starts&&!connects);
     if(storage_status!=ROOM_SEC_MISSING){
-        assert(!ap_starts&&!driver&&!prepares&&loads==2);
+        assert(!ap_starts&&!driver&&!prepares&&loads==1);
         assert(!tick(300000)&&!ap_starts);puts("PASS first boot rechecks protected profile");return 0;
     }
     uint64_t opened=0;
@@ -159,6 +217,7 @@ static int first_boot(const char *scenario) {
 int main(int argc,char **argv){
     const char *scenario=argc>1?argv[1]:"normal";
     storage.saved=(room_enroll_profile){.ssid_len=4,.pass_len=8,.ssid={'h','o','m','e'},.pass={'t','e','s','t','o','n','l','y'}};
+    if(!strncmp(scenario,"save_",5))return first_save(scenario);
     if(!strncmp(scenario,"first_",6))return first_boot(scenario);
     assert(room_wifi_idf_init(storage.saved.ssid,4,storage.saved.pass,8));
     room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};

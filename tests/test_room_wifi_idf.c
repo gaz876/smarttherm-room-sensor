@@ -45,7 +45,7 @@ static bool bind_setup(void *v){(void)v;assert(!initialized);++binds;return true
 static bool ready_setup(void *v){(void)v;return setup_ready;}
 static bool start_setup(void *v,uint64_t deadline,room_wifi_profile profile,bool physical){(void)v;assert(profile==ROOM_WIFI_PROFILE_VALID&&physical);assert(!initialized&&!allocated&&!started&&!queued&&!setup_running&&clock_ms<deadline);setup_running=true;++setup_starts;return true;}
 static bool poll_setup(void *v){(void)v;assert(setup_running&&!initialized);return setup_poll_ok;}
-static bool stop_setup(void *v){(void)v;assert(setup_running&&!initialized);++setup_stops;if(!setup_stoppable)return false;setup_running=false;return true;}
+static bool stop_setup(void *v,room_wifi_setup_result *result){(void)v;assert(result&&setup_running&&!initialized);++setup_stops;if(!setup_stoppable)return false;setup_running=false;*result=ROOM_WIFI_SETUP_NO_SAVE;return true;}
 static bool load_profile(void *v,room_enroll_profile *p){(void)v;assert(!initialized&&!setup_running);++profile_loads;if(!load_ok)return false;*p=(room_enroll_profile){.ssid_len=9,.pass_len=9};memcpy(p->ssid,"synthetic",9);memcpy(p->pass,"test-only",9);return true;}
 static int handoff(void){
     room_wifi_setup_io io={NULL,bind_setup,ready_setup,start_setup,poll_setup,stop_setup,load_profile};

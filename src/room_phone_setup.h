@@ -6,7 +6,7 @@
 typedef enum { PHONE_PROFILE_MISSING, PHONE_PROFILE_VALID, PHONE_PROFILE_ERROR } phone_profile_state;
 typedef struct {
     room_enroll enrollment;
-    uint64_t deadline, session, last_session;
+    uint64_t deadline, session, last_session, saved_generation;
     bool window, first_used, drain;
 } room_phone_setup;
 static inline void phone_cancel_trial(room_phone_setup *p) {
@@ -62,6 +62,9 @@ static inline room_enroll_result phone_save(room_phone_setup *p,uint64_t now,uin
     if (!phone_authorized(p,session)||p->drain||p->enrollment.state!=ENROLL_VERIFIED||
         !token||token!=p->enrollment.generation) return ENROLL_REJECTED;
     room_enroll_result result=enroll_commit(&p->enrollment,now,token,true,live,store);
+    /* Persistent per-boot receipt of the authenticated, verified commit.
+     * Independent of the final reply: delivery failure cannot undo flash. */
+    if (result==ENROLL_SAVED) p->saved_generation=token;
     if (p->enrollment.state==ENROLL_IDLE) p->drain=true;
     if (result!=ENROLL_REJECTED) phone_close(p);
     return result;

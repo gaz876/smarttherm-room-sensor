@@ -10,13 +10,16 @@
  * the first STA start. No callbacks from the phone or default event loop.
  * All callback context and resources persist until controlled reboot.
  * A failed start may own resources; stop must confirm actual release. */
+typedef enum { ROOM_WIFI_SETUP_NO_SAVE, ROOM_WIFI_SETUP_COMMITTED,
+    ROOM_WIFI_SETUP_UNCERTAIN } room_wifi_setup_result;
 typedef struct {
     void *ctx;
     bool (*bind)(void *);
     bool (*ready)(void *);
     bool (*start)(void *,uint64_t deadline,room_wifi_profile,bool physical_boot);
     bool (*poll)(void *);
-    bool (*stop)(void *);
+    /* Report outcome only after confirmed full cleanup; never from a packet. */
+    bool (*stop)(void *,room_wifi_setup_result *);
     bool (*load)(void *,room_enroll_profile *);
 } room_wifi_setup_io;
 bool room_wifi_idf_is_owner(void);

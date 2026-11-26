@@ -9,6 +9,7 @@ static struct {
     room_apsta_task task;
     room_enroll_store store;
     room_wifi_apsta_provider provider;
+    uint64_t prior_save;
     bool attempted;
 } a;
 static uint64_t now_ms(void) { return (uint64_t)(esp_timer_get_time()/1000); }
@@ -24,6 +25,7 @@ static bool ready(void *ctx) {
 }
 static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool physical_boot) {
     (void)ctx;
+    a.prior_save=a.task.session.bridge.phone.saved_generation;
     if (now_ms()>=deadline || !ready(NULL) ||
         (profile!=ROOM_WIFI_PROFILE_VALID && profile!=ROOM_WIFI_PROFILE_MISSING) ||
         (!physical_boot && profile!=ROOM_WIFI_PROFILE_MISSING)) return false;
@@ -49,18 +51,25 @@ static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool phy
     return ok;
 }
 static bool poll(void *ctx) { (void)ctx; return room_apsta_task_poll(&a.task); }
-static bool stop(void *ctx) {
+static bool stop(void *ctx,room_wifi_setup_result *result) {
     (void)ctx;
     room_apsta_session *s=&a.task.session;
-    if (s->locked || s->radio.phase==APSTA_LOCKED) return false;
-    if (!s->bridge.window)
-        return s->radio.phase==APSTA_IDLE && !s->transport.bridge &&
-            !s->transport.pending && !a.task.pending &&
-            !atomic_load(&a.task.events.accepting);
-    /* There is no listener or sender in this candidate. Never claim drain if
-     * a reply or dispatch is outstanding; a future transport must prove it. */
-    bool drained=!s->transport.pending && !s->transport.dispatching;
-    return room_apsta_task_close(&a.task,drained);
+    if (!result || s->locked || s->radio.phase==APSTA_LOCKED) return false;
+    if (!s->bridge.window) {
+        if (s->radio.phase!=APSTA_IDLE || s->transport.bridge ||
+            s->transport.pending || a.task.pending ||
+            atomic_load(&a.task.events.accepting)) return false;
+    } else {
+        /* There is no listener or sender in this candidate. Never claim drain
+         * if a reply or dispatch is outstanding. Future I/O must prove drain. */
+        bool drained=!s->transport.pending && !s->transport.dispatching;
+        if (!room_apsta_task_close(&a.task,drained)) return false;
+    }
+    const room_phone_setup *p=&s->bridge.phone;
+    *result=p->enrollment.storage_uncertain?ROOM_WIFI_SETUP_UNCERTAIN:
+        p->saved_generation>a.prior_save?ROOM_WIFI_SETUP_COMMITTED:ROOM_WIFI_SETUP_NO_SAVE;
+    a.prior_save=p->saved_generation;
+    return true;
 }
 static bool load(void *ctx,room_enroll_profile *p) {
     (void)ctx; return room_secure_load(p)==ROOM_SEC_VALID;
