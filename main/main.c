@@ -1,6 +1,8 @@
 #include "room_measure.h"
 #include "room_i2c_retry.h"
 #include "room_board.h"
+#include "room_runtime.h"
+#include "room_settings_nvs.h"
 #include "driver/i2c_master.h"
 #include "esp_timer.h"
 #include "esp_log.h"
@@ -9,6 +11,24 @@
 #include "sdkconfig.h"
 _Static_assert(ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL), "invalid I2C pin mapping");
 static const char *TAG="room_sensor";
+_Static_assert(ROOM_SETTINGS_MIN_MS==ROOM_MIN_INTERVAL_MS && ROOM_SETTINGS_MAX_MS==ROOM_MAX_INTERVAL_MS, "settings interval mismatch");
+static portMUX_TYPE snapshot_lock=portMUX_INITIALIZER_UNLOCKED;
+static room_measure published;
+static room_settings_result published_settings=ROOM_SETTINGS_IO_ERROR;
+static void publish_snapshot(const room_measure *m, room_settings_result status) {
+    portENTER_CRITICAL(&snapshot_lock);
+    published=*m;
+    published_settings=status;
+    portEXIT_CRITICAL(&snapshot_lock);
+}
+room_status room_runtime_snapshot(sht40_sample *out, room_settings_result *settings_status) {
+    room_measure copy;
+    portENTER_CRITICAL(&snapshot_lock);
+    copy=published;
+    if (settings_status) *settings_status=published_settings;
+    portEXIT_CRITICAL(&snapshot_lock);
+    return room_snapshot(&copy,(uint64_t)(esp_timer_get_time()/1000),out);
+}
 static bool tx(void *ctx,uint8_t cmd) {
     return i2c_master_transmit((i2c_master_dev_handle_t)ctx,&cmd,1,50)==ESP_OK;
 }
@@ -65,9 +85,22 @@ static bool delete_bus(void *ctx) {
 }
 void app_main(void) {
     room_measure m;
+    const room_settings defaults={CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0};
+    room_settings settings=defaults;
+    room_settings_result settings_status=ROOM_SETTINGS_IO_ERROR;
+    esp_err_t nvs_status=nvs_flash_init();
+    if (nvs_status==ESP_OK) {
+        const room_settings_store store=room_nvs_store();
+        settings_status=room_settings_load(&store,defaults,&settings);
+    } else {
+        ESP_LOGW(TAG,"NVS init failed: %d; retained partition",(int)nvs_status);
+    }
+    ESP_LOGI(TAG,"Measurement settings status=%d interval=%lu ms correction=%ld mdeg",
+        (int)settings_status,(unsigned long)settings.interval_ms,(long)settings.correction_mdeg);
     room_init(&m);
-    if (!room_configure(&m,CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0.0) ||
+    if (!room_configure(&m,settings.interval_ms,settings.correction_mdeg/1000.0) ||
         !ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL)) { ESP_LOGE(TAG,"Invalid configuration"); return; }
+    publish_snapshot(&m,settings_status);
     sensor_i2c sensor={
         .cfg={.i2c_port=I2C_NUM_0,.sda_io_num=CONFIG_ROOM_I2C_SDA,
             .scl_io_num=CONFIG_ROOM_I2C_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7},
@@ -80,11 +113,14 @@ void app_main(void) {
             uint32_t delay=room_i2c_prepare(&retry,&ops);
             if (delay) { wait_ms(NULL,delay); continue; }
             room_init(&m);
-            if (!room_configure(&m,CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0.0)) return;
+            if (!room_configure(&m,settings.interval_ms,settings.correction_mdeg/1000.0)) return;
+            publish_snapshot(&m,settings_status);
             io.ctx=sensor.dev;
             ESP_LOGI(TAG,"I2C ready; awaiting valid measurement");
         }
-        if (room_poll(&m,&io)) {
+        bool attempted=room_poll(&m,&io);
+        publish_snapshot(&m,settings_status);
+        if (attempted) {
             sht40_sample s;
             room_status status=room_snapshot(&m,now_ms(NULL),&s);
             if (status==ROOM_OK) ESP_LOGI(TAG,"T=%.2f C RH=%.2f %%",s.temperature,s.humidity);
