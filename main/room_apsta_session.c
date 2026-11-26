@@ -38,6 +38,12 @@ bool room_apsta_session_step(room_apsta_session *s,bool events_drained) {
     if (!s || s->locked || !s->bridge.window) return false;
     uint64_t now=session_clock(s); bridge_tick(&s->bridge,now);
     if (s->bridge.stopping || s->transport.stopped) return false;
+    /* An outstanding handshake reply has no bridge ticket, so bridge_tick
+     * alone cannot enforce its per-reply deadline. Stop the window without
+     * freeing the borrowed buffer: the sender must finish or drain first. */
+    if (s->transport.pending && now>=s->transport.deadline) {
+        bridge_stop(&s->bridge); return false;
+    }
     if (s->bridge.life.phase==SETUP_FINAL || s->transport.pending) return true;
     if (s->bridge.phone.drain || s->radio.phase!=APSTA_RUNNING) {
         bridge_stop(&s->bridge); return false;
