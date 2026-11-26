@@ -1,3 +1,12 @@
+# 2026-11-26 — Single network owner adapter candidate
+
+- Optional, uncalled STA/APSTA binding: the existing wifi_owner policy dispatches both real adapters, and the STA adapter binds to its actual task handle. The optional APSTA link wraps the real persistent room_apsta_task, only accepts a trusted local provider after STA initialization and before first radio start, and does not expose any packet or listener API. Physical BOOT remains the only manual setup trigger. Normal startup is unchanged and supplies no provider. Missing/corrupt first-boot setup is still not wired.
+- APSTA ownership is claimed before start (including partial failure); STA cannot restart while APSTA cleanup is incomplete. Shared 5 s cleanup deadline quarantines the Wi-Fi owner on timeout, with no forced reset. Setup deadline remains bounded by the original BOOT request; cancellation/readiness loss is handled by the owner. With the optional binding, credentials are wiped on STA cleanup and reloaded from the protected store before a new STA start. No new key generation or eFuse changes.
+- Added a real STA adapter / mock APSTA callback regression for physical BOOT, both barriers, no overlap, cancellation, and profile reload; actual APSTA adapter link is compiled in the target but still needs its own combined SDK integration fixture. New code and tests have not yet been built or executed. Prior static queue commit 8f228ceec291d75ea06adb9be76ef03834b4f907 passed target build and all five GCC tests in run 45778698977.
+- Still required: combined adapter fixture, verified identity provider and sender/credential lifetime, protected storage and first-boot handling, real DHCP freshness, heap/stack and physical Wi-Fi tests, and then MQTT. No startup activation, live listener, deployment, merge to protected PR #17, dependency changes or paid CI.
+
+---
+
 # 2026-11-26 — Dedicated APSTA static queue candidate
 
 - APSTA task context now embeds one static FreeRTOS queue with eight room_apsta_event records; the owner no longer accepts an arbitrary caller-supplied queue handle. No per-window allocation/free. Bind is single-use, rejects missing task or queue creation failure before callback registration, and retains persistent context on ambiguous registration failure. Context must be zero-initialized once and never moved/freed before reboot. Eight records is the existing mock capacity, not a measured hardware sizing guarantee.

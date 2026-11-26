@@ -2,7 +2,7 @@
 #define ROOM_WIFI_OWNER_H
 #include "room_wifi_policy.h"
 
-typedef enum { WIFI_EVENT_NONE, WIFI_EVENT_IP, WIFI_EVENT_LOST, WIFI_EVENT_SETUP_SAVED } room_wifi_event_kind;
+typedef enum { WIFI_EVENT_NONE, WIFI_EVENT_IP, WIFI_EVENT_LOST, WIFI_EVENT_SETUP_SAVED, WIFI_EVENT_SETUP_ABORTED } room_wifi_event_kind;
 typedef struct { room_wifi_event_kind kind; uint64_t generation; } room_wifi_event;
 typedef struct {
     void *ctx;
@@ -85,6 +85,9 @@ static inline void wifi_owner_step(room_wifi_owner *o,uint64_t now,bool manual,b
         wifi_failed(&o->policy,now); (void)wifi_owner_stop(o,now);
     } else if (e.kind==WIFI_EVENT_SETUP_SAVED) {
         wifi_owner_action(o,wifi_setup_done(&o->policy,now,true),now);
+    } else if (e.kind==WIFI_EVENT_SETUP_ABORTED && o->policy.state==ROOM_WIFI_SETUP) {
+        wifi_owner_abort_start(o,now);
+        wifi_owner_action(o,ROOM_WIFI_STOP,now);
     }
 }
 static inline bool wifi_owner_online(const room_wifi_owner *o) {
