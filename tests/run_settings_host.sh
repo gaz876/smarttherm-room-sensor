@@ -10,4 +10,7 @@ for cc in gcc clang; do
         timeout 10s "$work/$t"
         printf 'exit=0 %s %s\n' "$cc" "$t"
     done
+    "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=undefined -fno-sanitize-recover=all -Itests/mock_runtime -Itests/mock_nvs -Imain -Isrc main/main.c src/room_measure.c src/sht40.c tests/test_room_settings_runtime.c -lm -o "$work/test_room_settings_runtime"
+    timeout 10s "$work/test_room_settings_runtime"
+    printf 'exit=0 %s %s\n' "$cc" test_room_settings_runtime
 done
