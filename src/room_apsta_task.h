@@ -14,7 +14,7 @@ typedef struct {
     atomic_uint ack;
     uint32_t sequence, pending;
     uint64_t barrier_window;
-    bool final_phase, ready, failed;
+    bool final_phase, pretrial_phase, ready, failed;
 } room_apsta_task;
 bool room_apsta_task_bind(room_apsta_task *, QueueHandle_t);
 bool room_apsta_task_open(room_apsta_task *, phone_profile_state, bool, bool,

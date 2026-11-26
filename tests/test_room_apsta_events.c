@@ -34,6 +34,8 @@ int main(void) {
     s.bridge.stopping=false;
     for(unsigned i=0;i<3;i++)handler[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&got);
     assert(!room_apsta_events_poll(&e,&s)&&s.bridge.stopping&&!s.lease);
+    assert(room_apsta_events_discard(&e)&&!count&&atomic_load(&e.overflow));
+    assert(!room_apsta_events_poll(&e,&s)&&!s.lease);
     assert(room_apsta_events_unbind(&e)&&!handler[0]&&!handler[1]);
     assert(!room_apsta_events_poll(&e,&s)&&!room_apsta_events_bind(&e,records));
     puts("APSTA SDK events mock PASS");return 0;
