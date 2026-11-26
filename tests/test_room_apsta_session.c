@@ -30,9 +30,23 @@ int main(void) {
     assert(!room_apsta_session_close(&s,true,barrier,NULL)&&stops==1&&s.bridge.window);
     pre=true;assert(!room_apsta_session_close(&s,true,barrier,NULL)&&s.bridge.window&&destroys==2);
     post=true;assert(room_apsta_session_close(&s,true,barrier,NULL)&&!s.bridge.window&&!s.transport.bridge);
+    /* Handshake response has no bridge ticket. Poll must enforce its deadline
+     * even if the sender never acknowledges completion. Borrowed output stays
+     * allocated until sender completion or explicit drain. */
     reset();f.now=200;assert(room_apsta_session_open(&s,clock_ms,&f,PHONE_PROFILE_VALID,true,true,&store,ssid,1,key,16,&id,7));
+    assert(room_sec2_transport_exchange(&s.transport,true,hs,sizeof(hs),&out,&n));
+    assert(s.transport.pending&&!s.transport.ticket&&s.transport.reply==out);
+    f.now=s.transport.deadline-1;assert(room_apsta_session_step(&s,true));
+    f.now++;assert(!room_apsta_session_step(&s,true)&&s.bridge.stopping);
+    assert(s.transport.pending&&s.transport.reply==out&&!stops);
+    assert(!room_apsta_session_close(&s,false,barrier,NULL)&&!stops);
+    assert(!room_sec2_transport_finish(&s.transport,true)&&!s.transport.pending);
+    assert(!room_apsta_session_close(&s,true,barrier,NULL)&&stops==1);
+    pre=true;assert(!room_apsta_session_close(&s,true,barrier,NULL));
+    post=true;assert(room_apsta_session_close(&s,true,barrier,NULL)&&!s.bridge.window);
+    reset();f.now=3000;assert(room_apsta_session_open(&s,clock_ms,&f,PHONE_PROFILE_VALID,true,true,&store,ssid,1,key,16,&id,7));
     room_apsta_session_lost(&s);assert(!room_apsta_session_step(&s,true));
-    assert(!room_apsta_session_close(&s,true,barrier,NULL));f.now=5200;
+    assert(!room_apsta_session_close(&s,true,barrier,NULL));f.now=8000;
     assert(!room_apsta_session_close(&s,true,barrier,NULL)&&s.locked&&s.bridge.window);
     /* Release only the fake allocation after testing permanent quarantine. */
     protocomm_delete(s.transport.sec.pc);

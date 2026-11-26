@@ -1,3 +1,9 @@
+# Isolated AP/STA reply-deadline regression — 2026-11-26
+
+Isolated follow-up from protected PR #17 HEAD 0043c1e9498f22228db950144c0f6665ec83cf23. Pending Security 2 handshake reply now expires during session poll; borrowed buffer retained until sender completion/drain. New regression: old source fails assertion (exit 134); fixed source GCC 14.2.0 and Clang 17.0.0 strict C11 ASan/UBSan both exit 0. Test inputs match public baseline Git blobs; changed source d8b2758063b56c31c13afeb10c14b9ebf1e026c8 and test 0bf9f00b4391bbd54d50c1543dd8757ec3f80c4c. No live crypto/network/hardware, target build, workflow or startup activation. No private data, credentials or new dependencies. Existing branch remains frozen. Ruleset 28138548 active, no bypass. Cloud coordinator abandoned; use isolated branches and reviewed PRs. New branch has no workflow; default main workflows have only workflow_dispatch/main path-scoped push, permissions {}. Administrative secret/permission inventory unavailable via connector; no CI requested. Remaining gates: fresh DHCP status and pretrial event barrier, overflow cleanup, station handoff, identity, decrypted-buffer disposal, actual phone transport, dynamic memory and MQTT. Prior artifact 15088994612 archive SHA256 independently corrected to 0e6f102f495ccfc89b5b722433c0cbcce7e7b61796f4ed20b7c559bfb77a25fc.
+
+---
+
 # AP/STA task target build verified — 2026-11-26
 
 Run 45760537263 all four steps success, verified artifact 15088994612, CRC, 19+5 hashes, all 41 input paths. App 894896 B (+6272), factory free 153680 B, static DRAM 116622 (+8). Same partition/image/dependency manifests and linked archive set. Uncalled integration APIs retained, no real network, dynamic RAM or hardware proof. PR #20 remains draft.
