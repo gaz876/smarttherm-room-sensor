@@ -18,7 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=598f896a1d3e0ca3d66b0b2674f9eee31528214e
+          source_sha=be95be3d3676c24a077a443bdf4c01c9f7309980
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
