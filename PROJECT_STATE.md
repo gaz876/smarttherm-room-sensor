@@ -1,3 +1,11 @@
+# 2026-11-26 — Optional bounded phone channel candidate
+
+- Added owner-polled packet/reply transport boundary: fixed 4096-byte input, one in-flight reply, nonblocking backend contract, explicit partial send accounting, event/deadline checks, buffer wipe, and backend drain before releasing pending response or tearing down radio. Optional local attachment to existing APSTA link. Backend is not implemented yet; no listening socket, HTTP parser, client or startup caller. Backend must later prove AP-only bind and single peer, no retained buffer pointers, bounded execution and confirmed drain. The standard Espressif SoftAP/HTTP Security2 transport is a reference, not verified compatible with this project's custom commands. See https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/provisioning/protocomm.html .
+- Four additional combined cases: normal partial sends, ambiguous backend open, invalid send count, pending reply held until backend confirms drain. New code not compiled or executed. Prior d8aa27b2422c9338b1de5b43b3d7e368d00fc0e4 passed 47 GCC ASan/UBSan scenarios and target build in 45783784792; artifact 15099333083, CI digest 00fbd941bc0638b1b410efd273db6ad54885130f04e47cf7b81f9dd521db35c1. Clang absent. Added static RAM and CPU cost require measurement on target.
+- No live server, actual credential provisioning, eFuse changes, startup activation, deployment, protected merge or Cloudflare changes.
+
+---
+
 # 2026-11-26 — Read-only protected identity provider candidate
 
 - New versioned setup identity record in separate namespace setup_id within existing explicitly initialized protected room_wifi NVS partition. Read-only application API; no provisioning/write/generation function, no default identity. Strict size/length/padding and nonzero salt/verifier checks are syntax checks only, not evidence of strong or unique per-device credentials. Provider initializes once on a local owner task, validates and wipes probe, rereads only at window prepare, wipes temporary record, assigns local nonzero monotonically increasing SDK session IDs, disables setup after read failure. No startup caller or real phone transport.

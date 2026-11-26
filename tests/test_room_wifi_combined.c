@@ -177,6 +177,68 @@ static int first_save(const char *scenario){
     online(close_at+2050);assert(storage.saved.ssid_len==1&&storage.saved.ssid[0]=='x'&&storage.writes==1);
     puts("PASS verified first save, drained reply/radio, reload and STA");return 0;
 }
+static unsigned io_opens,io_closes,io_reads,io_writes;
+static bool io_pending,io_handshake,io_wait_close,io_fail_open,io_bad_send;
+static const uint8_t *io_input;
+static size_t io_len;
+static bool io_open(void *v,const esp_netif_t *netif,uint64_t window){
+    (void)v;assert(netif==&ap&&window&&driver&&started&&mode==WIFI_MODE_APSTA);++io_opens;return !io_fail_open;
+}
+static room_phone_io_result io_receive(void *v,bool *hs,uint8_t *buf,size_t cap,size_t *n){
+    (void)v;++io_reads;if(!io_pending)return ROOM_PHONE_IO_WAIT;
+    assert(io_len<=cap);*hs=io_handshake;*n=io_len;memcpy(buf,io_input,io_len);io_pending=false;return ROOM_PHONE_IO_OK;
+}
+static room_phone_io_result io_send(void *v,const uint8_t *buf,size_t n,size_t *written){
+    (void)v;assert(buf&&n);++io_writes;if(io_bad_send){*written=n+1;return ROOM_PHONE_IO_OK;}
+    if(io_writes==1)return ROOM_PHONE_IO_WAIT;
+    *written=1;return ROOM_PHONE_IO_OK;
+}
+static bool io_close(void *v){
+    (void)v;++io_closes;return !io_wait_close;
+}
+static int channel_case(const char *scenario){
+    room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};
+    storage_status=ROOM_SEC_MISSING;
+    assert(room_wifi_apsta_link_init_missing(p));
+    room_phone_io io={NULL,io_open,io_receive,io_send,io_close};
+    assert(room_wifi_apsta_link_attach_io(io)&&!room_wifi_apsta_link_attach_io(io));
+    io_fail_open=!strcmp(scenario,"channel_open_fail");
+    assert(!tick(0)&&ap_starts==1&&io_opens==1);
+    if(io_fail_open){
+        assert(io_closes==1&&posted&&stops==1);deliver();
+        assert(!tick(1000)&&posted&&!driver);deliver();
+        assert(!tick(2000)&&!driver&&!sta_starts&&!posted);
+        puts("PASS failed channel open drains before radio reuse");return 0;
+    }
+    uint8_t handshake[]={1};
+    io_input=handshake;io_len=sizeof(handshake);io_handshake=true;io_pending=true;
+    assert(!tick(1)&&io_reads==1&&!io_writes);
+    io_bad_send=!strcmp(scenario,"channel_bad_send");
+    assert(!tick(2)&&io_reads==1&&io_writes==1);
+    if(io_bad_send){
+        assert(io_closes==1&&posted&&stops==1);deliver();assert(!tick(1002)&&posted&&!driver);deliver();
+        assert(!tick(2002)&&!driver&&!sta_starts&&!posted);puts("PASS invalid send count aborts");return 0;
+    }
+    assert(!tick(3)&&io_writes==2&&io_reads==1);
+    uint8_t stage[29]={1,ROOM_SETUP_STAGE,1,8,'x','a','b','c','d','e','f','g','h'};
+    io_input=stage;io_len=sizeof(stage);io_handshake=false;io_pending=true;
+    assert(!tick(4)&&io_reads==2&&io_writes==2);
+    assert(!tick(5)&&io_writes==3&&io_reads==2);
+    if(!strcmp(scenario,"channel_drain")){
+        io_wait_close=true;disconnect_event();assert(!tick(6)&&io_closes==1&&!stops&&!posted&&driver);
+        assert(!tick(1006)&&io_closes==2&&!stops);
+        io_wait_close=false;assert(!tick(2006)&&io_closes==3&&posted&&stops==1);deliver();
+        assert(!tick(3006)&&posted&&!driver);deliver();assert(!tick(4006)&&!driver&&!posted&&!sta_starts);
+        puts("PASS pending reply held until channel drain");return 0;
+    }
+    for(uint64_t i=6;i<=31;i++)assert(!tick(i)&&io_reads==2);
+    assert(io_writes==29&&!connects);
+    assert(!tick(32)&&posted&&!connects&&io_reads==2);deliver();
+    assert(!tick(33)&&connects==1&&!posted);
+    disconnect_event();assert(!tick(34)&&io_closes==1&&posted&&stops==1);
+    deliver();assert(!tick(1034)&&posted&&!driver);deliver();assert(!tick(2034)&&!driver&&!posted&&!sta_starts);
+    puts("PASS bounded channel receive, partial sends, no overlapping request, drain");return 0;
+}
 static int first_boot(const char *scenario) {
     room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};
     if(!strcmp(scenario,"first_error"))storage_status=ROOM_SEC_ERROR;
@@ -218,6 +280,7 @@ static int first_boot(const char *scenario) {
 int main(int argc,char **argv){
     const char *scenario=argc>1?argv[1]:"normal";
     storage.saved=(room_enroll_profile){.ssid_len=4,.pass_len=8,.ssid={'h','o','m','e'},.pass={'t','e','s','t','o','n','l','y'}};
+    if(!strncmp(scenario,"channel_",8))return channel_case(scenario);
     if(!strncmp(scenario,"save_",5))return first_save(scenario);
     if(!strncmp(scenario,"first_",6))return first_boot(scenario);
     assert(room_wifi_idf_init(storage.saved.ssid,4,storage.saved.pass,8));

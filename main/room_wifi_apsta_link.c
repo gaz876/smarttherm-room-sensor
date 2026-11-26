@@ -7,6 +7,9 @@
  * by normal startup. Only the station owner's task can bind it. */
 static struct {
     room_apsta_task task;
+    room_phone_channel channel;
+    room_phone_io io;
+    bool io_bound;
     room_enroll_store store;
     room_wifi_apsta_provider provider;
     uint64_t prior_save;
@@ -50,20 +53,26 @@ static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool phy
     enroll_wipe(&p,sizeof(p));
     if (ok && a.task.session.bridge.phone.deadline>deadline)
         a.task.session.bridge.phone.deadline=deadline;
+    if(ok && a.io_bound)ok=room_phone_channel_open(&a.channel,&a.task,a.io);
     return ok;
 }
-static bool poll(void *ctx) { (void)ctx; return room_apsta_task_poll(&a.task); }
+static bool poll(void *ctx) {
+    (void)ctx;
+    return a.io_bound?room_phone_channel_poll(&a.channel):room_apsta_task_poll(&a.task);
+}
 static bool stop(void *ctx,room_wifi_setup_result *result) {
     (void)ctx;
     room_apsta_session *s=&a.task.session;
-    if (!result || s->locked || s->radio.phase==APSTA_LOCKED) return false;
+    if (!result) return false;
+    if(a.io_bound&&!room_phone_channel_close(&a.channel))return false;
+    if(s->locked||s->radio.phase==APSTA_LOCKED)return false;
     if (!s->bridge.window) {
         if (s->radio.phase!=APSTA_IDLE || s->transport.bridge ||
             s->transport.pending || a.task.pending ||
             atomic_load(&a.task.events.accepting)) return false;
     } else {
-        /* There is no listener or sender in this candidate. Never claim drain
-         * if a reply or dispatch is outstanding. Future I/O must prove drain. */
+        /* Optional backend has already confirmed drain. Without a backend,
+         * never claim drain while a test/other local sender still owns reply. */
         bool drained=!s->transport.pending && !s->transport.dispatching;
         if (!room_apsta_task_close(&a.task,drained)) return false;
     }
@@ -89,4 +98,11 @@ bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider provider) {
     enroll_wipe(&p,sizeof(p));
     if (status!=ROOM_SEC_MISSING) return false;
     return room_wifi_idf_init_missing() && room_wifi_apsta_link_bind(provider);
+}
+
+bool room_wifi_apsta_link_attach_io(room_phone_io io) {
+    if(!room_wifi_idf_is_owner()||!a.attempted||!a.task.ready||a.io_bound||
+        a.task.session.bridge.last_window||a.channel.attempted||
+        !io.open||!io.receive||!io.send||!io.close)return false;
+    a.io=io;a.io_bound=true;return true;
 }
