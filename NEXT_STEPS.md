@@ -1,3 +1,9 @@
+# Runtime NVS integrated; Wi-Fi next — 2026-11-26
+
+NVS source 6bd64d225c4c97884760ed0e25c4048c626b521b built and integrated in dev 759921b744300f304830292ca35060011c867de6. Next: autonomous Wi-Fi policy and tested ESP-IDF adapter, protected first boot/manual BOOT setup, DHCP default, indefinite nonblocking reconnect without automatic AP on disconnection, credential storage and provisioning review. No real credentials in sources or CI. No automatic NVS erase or irreversible eFuse changes; secure storage design must precede real credential use. Physical NVS/power-loss and concurrent tests outstanding. No hardware flash, OTA, heating, paid/private CI.
+
+---
+
 # Runtime settings command candidate — 2026-11-26
 
 NVS startup/storage baseline is integrated in dev 9e679f776ed56a97c975b9e1733d9aefe63e9ab8. Target-build the new runtime command candidate with retained artifacts, verify exact source blobs and archive; integrate experimental PR into dev after review. Future protected Wi-Fi/web path must authenticate, serialize command clients, consume result before submitting another, rate-limit explicit saves and reject invalid/stale measurement or unsafe settings status. Credential storage review remains before Wi-Fi. Physical NVS persistence/power-loss and FreeRTOS concurrency not proven. No hardware flash, OTA, heating or paid/private CI.
