@@ -1,3 +1,9 @@
+# Security 2 target footprint build verified — 2026-11-26
+
+Run 45755803953 all four steps success, artifact 15087259482 independently checked: CRC, 19+5 hashes and 32 input entries; exact SDK image and dependency manifests unchanged. App 888624 bytes (+41200); 159952 bytes free in factory; static DRAM 116614 (+16). ELF retains Security 2 and four adapter symbols. No real network or dynamic heap measurement. PR #20 not merged. Prior pending checkpoint superseded.
+
+---
+
 # Offline Security 2 packet binding — 2026-11-26
 
 Added direct SDK adapter and mock integration test; both actual GCC/Clang ASan/UBSan runs pass, five published hashes match. Experimental target source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775 includes uncalled link retention and Security 2 only. Dedicated PR #20 run 45755803953 started, result pending. No real transport/AP, credentials or deployment.
