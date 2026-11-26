@@ -1,0 +1,40 @@
+name: ESP-IDF 6.1.1 registry metadata qualification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/esp-idf611-metadata.yml']
+permissions: {}
+concurrency:
+  group: esp-idf611-metadata
+  cancel-in-progress: true
+jobs:
+  metadata:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/sec2-footprint-20261126'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read registry metadata only, no image execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          image=docker.io/espressif/idf:v6.1.1
+          metadata="$(mktemp)"
+          trap 'rm -f "$metadata"' EXIT
+          timeout 60s docker buildx imagetools inspect --raw "$image" > "$metadata"
+          python3 - "$metadata" <<'PY'
+          import json, re, sys, hashlib
+          with open(sys.argv[1], 'rb') as f:
+              raw = f.read()
+          data = json.loads(raw)
+          matches = [m for m in data.get('manifests', []) if m.get('platform', {}).get('os') == 'linux' and m.get('platform', {}).get('architecture') == 'amd64']
+          assert len(matches) == 1, 'expected unique linux/amd64 image'
+          digest = matches[0]['digest']
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest)
+          assert digest.startswith('sha256:e5b767c64fdf'), 'Docker Hub published prefix changed'
+          print('IDF611_AMD64_MANIFEST=' + digest)
+          print('RAW_INDEX_SHA256=' + hashlib.sha256(raw).hexdigest())
+          print('IDF611_METADATA_OK')
+          PY
+          # Metadata only. Never pull or run a mutable tag.
