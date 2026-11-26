@@ -6,7 +6,9 @@ static uint64_t session_clock(void *v) {
 static bool session_live(void *v,uint64_t trial) {
     room_apsta_session *s=v;
     esp_netif_ip_info_t ip={0};
+    esp_netif_dhcp_status_t dhcp=ESP_NETIF_DHCP_INIT;
     return !s->locked && s->lease && room_apsta_link(&s->radio,s->bridge.window,trial) &&
+        esp_netif_dhcpc_get_status(s->radio.sta,&dhcp)==ESP_OK && dhcp==ESP_NETIF_DHCP_STARTED &&
         esp_netif_get_ip_info(s->radio.sta,&ip)==ESP_OK && ip.ip.addr==s->lease;
 }
 void room_apsta_session_ip(room_apsta_session *s,const esp_netif_t *netif,uint32_t ip) {
@@ -38,6 +40,10 @@ bool room_apsta_session_step(room_apsta_session *s,bool events_drained) {
     if (!s || s->locked || !s->bridge.window) return false;
     uint64_t now=session_clock(s); bridge_tick(&s->bridge,now);
     if (s->bridge.stopping || s->transport.stopped) return false;
+    if (s->transport.pending && now>=s->transport.deadline) {
+        /* Keep the borrowed reply alive until the actual sender drains. */
+        bridge_stop(&s->bridge); return false;
+    }
     if (s->bridge.life.phase==SETUP_FINAL || s->transport.pending) return true;
     if (s->bridge.phone.drain || s->radio.phase!=APSTA_RUNNING) {
         bridge_stop(&s->bridge); return false;

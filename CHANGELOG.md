@@ -1,3 +1,9 @@
+# Isolated AP/STA follow-up — 2026-11-26
+
+2026-11-26: Isolated follow-up from protected PR #17 HEAD 0043c1e9498f22228db950144c0f6665ec83cf23. Require SDK DHCP client STARTED status, successful query, live STA link and matching got-IP address before accepting enrollment; this is not proof of a fresh DHCP lease. Stop pending Security 2 response at deadline during owner polling while retaining buffer until sender completion/drain. Actual GCC 14.2.0 and Clang 17.0.0 strict C11 ASan/UBSan session/events/task mock runs 6/6 exit 0. Target build and hardware not run. No changes to startup, credentials, eFuse, CI or production. Protected baseline unchanged. Remaining: pretrial event-loop barrier, queue overflow teardown, exclusive station handoff, credential buffer disposal, physical validation and target build. Correct prior artifact 15088994612 ZIP SHA256 to 0e6f102f495ccfc89b5b722433c0cbcce7e7b61796f4ed20b7c559bfb77a25fc (4468301 bytes, verified local ZIP).
+
+---
+
 # AP/STA task target build verified — 2026-11-26
 
 Run 45760537263 all four steps success, verified artifact 15088994612, CRC, 19+5 hashes, all 41 input paths. App 894896 B (+6272), factory free 153680 B, static DRAM 116622 (+8). Same partition/image/dependency manifests and linked archive set. Uncalled integration APIs retained, no real network, dynamic RAM or hardware proof. PR #20 remains draft.
