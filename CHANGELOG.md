@@ -1,3 +1,9 @@
+# Dual-netif AP/STA owner candidate — 2026-11-26
+
+Added isolated direct SDK APSTA owner and mock test at 6ba25177d679fb0fd5fa24596b173071d0810a23; actual GCC/Clang ASan/UBSan runs exit 0, all five published blobs match. Start, explicit single trial, stop and two-phase drain tested. Real DHCP, barriers, transport, CMake/startup and hardware not wired; one trial per window provisional. No new target build.
+
+---
+
 # AP/STA preparation and memory instrumentation — 2026-11-26
 
 Added two isolated headers and six test/mock files at 9a39e7bb984fd7e73694c2ad241169e525dcb583. Four actual GCC/Clang ASan/UBSan host runs passed, all eight published blobs match. Reviewed SDK AP/STA shared handlers, NVS read-key path, and initial SmartTherm MQTT numeric callbacks. No actual radio, phone interop, hardware encryption or RAM measurement, broker implementation, new target build or workflow change.
