@@ -1,3 +1,9 @@
+# AP/STA task and DHCP event binding — 2026-11-26
+
+Added experimental session coordinator, queued SDK event capture and exclusive task boundary; six actual GCC/Clang ASan/UBSan host test runs passed, with test-only cleanup for quarantine path. CMake retains uncalled integration APIs. Target source 647b0e4437a9f6125e313af0c315dbd56863e5b1; test checkpoint 729618d86862f8c050b2646899c3a720902c01a7. CI PR #20 run 45760537263 in progress. No live socket, real startup activation, hardware or deployed change.
+
+---
+
 # Dual-netif AP/STA owner candidate — 2026-11-26
 
 Added isolated direct SDK APSTA owner and mock test at 6ba25177d679fb0fd5fa24596b173071d0810a23; actual GCC/Clang ASan/UBSan runs exit 0, all five published blobs match. Start, explicit single trial, stop and two-phase drain tested. Real DHCP, barriers, transport, CMake/startup and hardware not wired; one trial per window provisional. No new target build.
