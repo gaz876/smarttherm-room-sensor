@@ -49,10 +49,13 @@ static bool advance(room_apsta_task *t,bool drained) {
     }
     return room_apsta_session_step(s,drained);
 }
-bool room_apsta_task_bind(room_apsta_task *t,QueueHandle_t queue) {
-    if (!t || !queue || t->owner || t->failed) return false;
+bool room_apsta_task_bind(room_apsta_task *t) {
+    if (!t || t->owner || t->failed) return false;
     t->owner=xTaskGetCurrentTaskHandle();atomic_init(&t->ack,0u);
-    if (!t->owner || esp_event_handler_instance_register(ROOM_APSTA_BARRIER,0,barrier_received,t,&t->barrier_handler)!=ESP_OK ||
+    if (!t->owner) { t->failed=true; return false; }
+    QueueHandle_t queue=xQueueCreateStatic(ROOM_APSTA_QUEUE_DEPTH,sizeof(room_apsta_event),
+        (uint8_t *)t->queue_storage,&t->queue_control);
+    if (!queue || esp_event_handler_instance_register(ROOM_APSTA_BARRIER,0,barrier_received,t,&t->barrier_handler)!=ESP_OK ||
         !room_apsta_events_bind(&t->events,queue)) { t->failed=true; return false; }
     t->ready=true;return true;
 }
