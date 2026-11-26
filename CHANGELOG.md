@@ -1,3 +1,9 @@
+# Setup transport lifecycle model — 2026-11-26
+
+Added isolated model and test at c1a83001e86314be2f258fa3ea24df088e7142f2. GCC/Clang strict ASan/UBSan actual runs passed, both published blobs match local tests. One pending request, final reply deadline and explicit cleanup gate. Not connected to SDK or dispatch. No new CI requested or target build.
+
+---
+
 # Experimental phone command dispatch — 2026-11-26
 
 Added isolated command dispatch and fixed reply at dcb64b90902749e4fe5e58982e70aa0ee1bbd20c. Two actual strict ASan/UBSan host runs passed on GCC/Clang, all five source/test blobs match pinned GitHub. No actual network, flash, target build, new dependencies or CI requested.
