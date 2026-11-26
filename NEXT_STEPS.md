@@ -1,3 +1,11 @@
+# 2026-11-26 — Read-only protected identity provider candidate
+
+- New versioned setup identity record in separate namespace setup_id within existing explicitly initialized protected room_wifi NVS partition. Read-only application API; no provisioning/write/generation function, no default identity. Strict size/length/padding and nonzero salt/verifier checks are syntax checks only, not evidence of strong or unique per-device credentials. Provider initializes once on a local owner task, validates and wipes probe, rereads only at window prepare, wipes temporary record, assigns local nonzero monotonically increasing SDK session IDs, disables setup after read failure. No startup caller or real phone transport.
+- Synthetic host fixture exercises real store/provider, including absent, truncated, invalid version, noncanonical padding, zero salt/verifier, read error, invalid lengths, owner mismatch, repeated prepare and revocation. Candidate not built/tested. Prior f6eac7b9c6f00ac6429ddae98d5d6122d52731d7 passed 28 GCC ASan/UBSan scenarios and target build in 45782880254; artifact 15099481482, CI digest 1f6ebcbd7d0918171517969ca348819955393a40badf91a199d3f45bdfc66e60. Clang absent.
+- Espressif documentation: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/storage/nvs_encryption.html . HMAC-based encrypted NVS is confidentiality protection, not independent authenticated storage or proof of verified boot; real individual identity provisioning and physical trust model require explicit review. No keys, eFuse operations, startup changes, deployment, protected merge or Cloudflare changes.
+
+---
+
 # 2026-11-26 — Owned Security2 identity lifecycle candidate
 
 - Security2 context owns salt (8–64 bytes) and verifier (384 bytes), including persistent SDK descriptor. Never move live context. Wipe on confirmed SDK deletion, retain on ambiguous session open/close. Provider fills inline bytes; temporary window wiped even on prepare failure. No actual identity provider, generation or listener.
