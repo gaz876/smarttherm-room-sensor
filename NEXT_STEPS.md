@@ -1,3 +1,9 @@
+# Wi-Fi adapter next — 2026-11-26
+
+Implement and test actual ESP-IDF event/task adapter, protected setup and credential storage design, BOOT and DHCP, stop/drain, generation and action-failure handling. Do not expose AP or persist real passwords until protected setup and storage verified. Target build and actual device testing pending. No repeat unrelated tests.
+
+---
+
 # Runtime NVS integrated; Wi-Fi next — 2026-11-26
 
 NVS source 6bd64d225c4c97884760ed0e25c4048c626b521b built and integrated in dev 759921b744300f304830292ca35060011c867de6. Next: autonomous Wi-Fi policy and tested ESP-IDF adapter, protected first boot/manual BOOT setup, DHCP default, indefinite nonblocking reconnect without automatic AP on disconnection, credential storage and provisioning review. No real credentials in sources or CI. No automatic NVS erase or irreversible eFuse changes; secure storage design must precede real credential use. Physical NVS/power-loss and concurrent tests outstanding. No hardware flash, OTA, heating, paid/private CI.

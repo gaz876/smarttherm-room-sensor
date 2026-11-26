@@ -1,3 +1,9 @@
+# Wi-Fi policy experiment — 2026-11-26
+
+Standalone policy and two passed host runs; no target networking or firmware integration. See docs/WIFI_POLICY.md.
+
+---
+
 # Runtime NVS build and integration — 2026-11-26
 
 PR #14 merged to dev 759921b744300f304830292ca35060011c867de6 after actual target run 45730901218 and independent artifact 15077320314 verification (20 files, checksums, all 14 inputs). No source differences after merge. App 220256 bytes, static DRAM 62458. No repeat host tests or hardware use.
