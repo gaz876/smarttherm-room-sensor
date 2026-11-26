@@ -1,3 +1,9 @@
+# AP/STA task target build complete — 2026-11-26
+
+Pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, run 45760537263, artifact 15088994612 verified. Test checkpoint 729618d86862f8c050b2646899c3a720902c01a7. Next station-to-AP exclusive runtime handoff and queue allocation, trusted per-device identity, SDK decrypted-buffer disposal and reviewed real socket lifecycle, actual phone setup and DHCP/channel/cleanup tests. Keep activation blocked pending these gates. Protected NVS physical tests, dynamic heap/stack and MQTT broker remain queued. 153680 B free in factory partition; not runtime memory proof. No unrelated old tests/rebuild, automatic eFuse/OTA/heating or paid/private CI. PR #17/#20 draft; no main merge.
+
+---
+
 # AP/STA integration target build pending — 2026-11-26
 
 Check run 45760537263/job 139709205908 for pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, verify full log, linked symbols, artifact hashes/source manifest and footprint. Task integration currently uncalled; next actual exclusive station handoff and queue allocation, trusted identity/bootstrap, secure SDK credential buffer disposal, bounded live socket and physical AP/STA/DHCP/channel/cleanup. Provisional 5 s cleanup deadline is not preemption, event barriers require physical proof; lockout is not radio-off guarantee. No automatic eFuse/OTA/heating or paid/private CI. Queue retained: phone client, protected NVS hardware tests, dynamic RAM, MQTT compatibility and broker. No unrelated old tests or repeat build of unchanged source.
