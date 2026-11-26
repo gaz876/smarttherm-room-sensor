@@ -1,3 +1,9 @@
+# Security 2 context checkpoint — 2026-11-26
+
+Continue from 74156c8be6a72b99c8a76f0921aec780d6ea307d. Context ownership mock tests complete. Review applicable SDK dependency and decrypted-buffer disposal gates, trusted per-device salt/verifier provisioning and secure storage. Implement bounded single-owner transport and endpoint/bridge binding with real response completion, no plaintext fallback; actual AP/STA cleanup, DHCP and Android client. Audit isolated target build inputs, measure link footprint before activation and confirm real Security 2 interoperability. No old test repetition or automatic eFuse/flash/OTA/heating, no paid/private CI. Context is not wired into CMake or runtime and no real Security 2 handshake has been tested.
+
+---
+
 # Setup model integration checkpoint — 2026-11-26
 
 Continue from 85cbc2c5b0953059281d700040fddc8c3bbcc741. Offline bridge tests complete. Next review exact SDK Security2 session and buffer ownership, authenticated per-device identity, AP/STA trial implementation and completion/cleanup semantics. Bind actual adapter and protected store only after applicable dependency and memory review; ensure input/output lifetime, bounded queues/callbacks, fresh DHCP and timeout behavior. No old test repetition; no automatic eFuse, plaintext fallback, hardware/OTA/heating or paid/private CI. Target build after relevant integration.
