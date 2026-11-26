@@ -49,7 +49,10 @@ jobs:
             # Approved experiment: only a disposable container copy is modified.
             cp main/partitions.csv /tmp/original-partitions.csv
             grep -qx "factory,app,factory,0x10000,1M," /tmp/original-partitions.csv
-            sed -i "s/^factory,app,factory,0x10000,1M,$/factory,app,factory,0x120000,2M,/" main/partitions.csv
+            # CSV generator expects partitions in ascending offset order.
+            sed -i "/^factory,app,factory,0x10000,1M,$/d" main/partitions.csv
+            printf "factory,app,factory,0x120000,2M,\n" >> main/partitions.csv
+            python -c "import csv; rows=[r for r in csv.reader(open(\"main/partitions.csv\")) if r and not r[0].lstrip().startswith(chr(35))]; assert [r[0] for r in rows]==[\"nvs\",\"phy_init\",\"room_wifi\",\"factory\"]; assert [int(r[3],0) for r in rows]==[0x9000,0xf000,0x110000,0x120000]; assert rows[-1][4]==\"2M\"; print(\"CSV_ORDER_OK\")"
             sed -i "s/^# Experimental only; preserve existing NVS, PHY and factory offsets\.$/# Experimental only; preserve NVS and PHY; relocated factory./" main/partitions.csv
             cat main/partitions.csv
             generator="$IDF_PATH/components/partition_table/gen_esp32part.py"
