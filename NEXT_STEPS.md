@@ -1,3 +1,11 @@
+# 2026-11-27 — Inert HTTPS footprint experiment
+
+- Draft PR #27, ci/https-footprint-20261127, workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8; run 45906704171 status at capture in_progress, conclusion pending. Do not duplicate; inspect final logs, linker symbols, size and build exit before reporting measurement.
+- Pinned source 1d005d634705baa187af55fb21f7b548c642da93, all firmware input blob SHAs match qualified 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2. SDK 6.1.1 / GCC 15.2.0, same pinned public image. Temporary CMake copy only: force inclusion of HTTPS start/stop and representative request/response functions; no runtime calls, credentials, listener, OTA, partition edits or firmware upload. Offline capability-dropped container, read-only source, permissions {}.
+- Current declared flash 4 MiB; factory offset 0x10000 size 1 MiB; room_wifi NVS offset 0x110000 size 0x6000. Baseline 934224 bytes and 114352 free. If measured binary exceeds partition, record explicit SDK partition error and negative headroom; do not bypass partition validation. Probe is dependency footprint, not complete browser backend or runtime TLS heap. No actual hardware flash capacity verified. Preserve prior build and protected branch. Any partition redesign requires separate approval and migration/rollback assessment.
+
+---
+
 # 2026-11-27 — ESP-IDF 6.1.1 qualification PASS
 
 - PR #26 workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973, job 140197424290 completed success. Exact source 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2, SDK 051e4c4eb20346e043cdd47bc388fde75ff8af63, image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c, RISC-V GCC 15.2.0. HTTPS_SDK_PROBE_OK, ESP32C3_BUILD_OK, all 51 GCC ASan/UBSan mock scenarios passed; Clang unavailable; no warning lines in job log. Token Metadata: read.
