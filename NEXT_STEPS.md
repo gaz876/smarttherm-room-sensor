@@ -1,3 +1,9 @@
+# Wi-Fi enrollment integration — 2026-11-26
+
+Station adapter target compile and artifact verification complete; no need to repeat this build solely for evidence. New standalone enrollment transaction host tests pass. Continue with reviewed secure storage backend and trusted per-device setup identity, no plaintext fallback or automatic eFuse writes; implement authenticated phone setup and real AP/STA trial, fresh DHCP proof and explicit persistence, reboot recovery and session zeroization. Bind BOOT and station adapter into dedicated network task without changing measurement logic. Verify real linked Wi-Fi dependency closure and target build only after functional integration. PR #17 remains draft; no flash/OTA/heating. Prove physical board storage state and actual network behavior before use. No unrelated test repetition.
+
+---
+
 # Wi-Fi target and enrollment gates — 2026-11-26
 
 Inspect run 45735143422 when terminal, verify full log, compiled adapter object, artifact and source blobs. Source 6a986225ed3bf2312ac7adf1524181e72f6c9fc0; later journal-only changes allowed. Do not claim runtime networking from unused adapter. Continue protected enrollment/storage design docs/WIFI_ENROLLMENT.md, implement authorized profile lifecycle and separate task; validate actual GPIO9, DHCP, event barriers, resource usage and loss recovery. Stock wifi_prov_mgr switches to FLASH; don't use as-is. No automatic eFuse writes or plaintext fallback. No repeated unrelated tests.

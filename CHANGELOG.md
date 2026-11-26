@@ -1,3 +1,9 @@
+# Wi-Fi station CI verification and enrollment transaction — 2026-11-26
+
+Verified existing target build and archived hashes independently. Added and tested a standalone enrollment transaction with fail-closed storage gate and runtime uncertainty latch. No live networking, encrypted NVS backend, UI, deployment, or new CI. Prior tests not repeated.
+
+---
+
 # Wi-Fi target CI and provisioning review — 2026-11-26
 
 PR #18 workflow-only merged; run 45735143422 building, not yet verified. Reviewed stock provisioning manager and HMAC provider; documented credential storage/logging and irreversible generation risks. No hardware or network activation.
