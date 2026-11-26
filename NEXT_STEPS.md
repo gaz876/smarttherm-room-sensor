@@ -1,3 +1,9 @@
+# Transport lifecycle checkpoint — 2026-11-26
+
+Continue from c1a83001e86314be2f258fa3ea24df088e7142f2. New lifecycle host tests complete. Next integrate dispatcher, phone owner and lifecycle in an isolated adapter test, including timeout/stop propagation and actual clock after blocking operations; verify Security2 SDK session/buffer ownership and completion semantics, trusted per-device identity, Android client, AP/STA cleanup and DHCP, resource sizing and applicable advisories before exposure. Fixed 2 s budget provisional. No old test repetition, hardware, eFuse, OTA, heating or plaintext fallback. Target build only after relevant integration.
+
+---
+
 # Phone command dispatch checkpoint — 2026-11-26
 
 Continue from dcb64b90902749e4fe5e58982e70aa0ee1bbd20c. Dispatch tests complete; no unrelated test repetition. Next bounded transport owner lifecycle including final response/timeout before AP teardown, queue/rate limits, monotonic deadline and real AP/STA trial cleanup, trusted link/DHCP observation. Review official SDK Security2 session/buffer lifetime, per-device identity, Android client and memory/partition/advisory gates before actual network integration. No hardware/eFuse/OTA/heating or plaintext fallback. No new target build until relevant integration.
