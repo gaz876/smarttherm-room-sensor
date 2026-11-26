@@ -1,3 +1,11 @@
+# 2026-11-27 — ESP-IDF 6.1.1 qualification in progress
+
+- Draft PR #26, ci/idf611-qualification-20261127, workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973 in progress at capture. Do not duplicate. Read final job logs and independently verify artifact before claiming success.
+- Source 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2, only four tests/https_sdk_probe files differ from compiled input 4616624dd00abe44f0b2dabce2b44b657c85383d; firmware unchanged. SDK 051e4c4eb20346e043cdd47bc388fde75ff8af63, recommended GCC 15.2.0, image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c.
+- Offline capability-dropped container, read-only public inputs, minimal token, no secrets/OTA/activation. Compile HTTPS probe and firmware, check config and symbols, run 51 host cases, record sizes and checksums. Baseline 5.5.6 and protected branch preserved. Hardware/browser tests pending.
+
+---
+
 # 2026-11-27 — Public Git history audit completed
 
 - User supplied repository Actions settings screenshot: full SHA pin required, all external contributors require approval, default token read-only, Actions PR creation/approval disabled, all Actions allowed. User reports Actions secrets/variables and environments empty. Screenshot repository identity relies on user context; organization-wide settings not independently accessible. Retain full SHA requirement; no settings changed.
