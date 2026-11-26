@@ -5,8 +5,10 @@ struct esp_netif { unsigned type; bool allocated,attached,up; uint32_t ip; };
 static struct esp_netif ap,sta;
 static bool driver,started,linked,pre,post,stay_up;
 static unsigned calls,fail,stops,connects,destroys,deinits;
+static esp_netif_dhcp_status_t dhcp_status;
+static bool dhcp_error;
 static int op(void) { return ++calls==fail?ESP_FAIL:ESP_OK; }
-static void reset(void) { ap=(struct esp_netif){.type=1};sta=(struct esp_netif){.type=2};driver=started=linked=pre=post=stay_up=false;calls=fail=stops=connects=destroys=deinits=0; }
+static void reset(void) { ap=(struct esp_netif){.type=1};sta=(struct esp_netif){.type=2};driver=started=linked=pre=post=stay_up=dhcp_error=false;dhcp_status=ESP_NETIF_DHCP_STARTED;calls=fail=stops=connects=destroys=deinits=0; }
 int esp_wifi_init(const wifi_init_config_t *c) { assert(!driver&&!c->nvs_enable);int r=op();if(!r)driver=true;return r; }
 esp_netif_t *esp_netif_new(const esp_netif_config_t *c) { assert(driver);struct esp_netif *p=c->type==1?&ap:&sta;assert(!p->allocated);if(op())return NULL;p->allocated=true;return p; }
 int esp_netif_attach_wifi_ap(esp_netif_t *p) { assert(p==&ap&&p->allocated);int r=op();if(!r)p->attached=true;return r; }
@@ -19,6 +21,7 @@ int esp_wifi_start(void) { assert(driver&&ap.attached&&sta.attached);int r=op();
 int esp_wifi_connect(void) { assert(started&&sta.attached);connects++;return op(); }
 int esp_wifi_sta_get_ap_info(wifi_ap_record_t *p) { (void)p;return linked?ESP_OK:ESP_FAIL; }
 bool esp_netif_is_netif_up(esp_netif_t *p) { assert(p->allocated);return p->up; }
+int esp_netif_dhcpc_get_status(esp_netif_t *p,esp_netif_dhcp_status_t *v) { assert(p==&sta&&p->allocated);if(dhcp_error)return ESP_FAIL;*v=dhcp_status;return ESP_OK; }
 int esp_netif_get_ip_info(esp_netif_t *p,esp_netif_ip_info_t *i) { assert(p->allocated);i->ip.addr=p->ip;return ESP_OK; }
 int esp_wifi_stop(void) { assert(driver&&started);stops++;int r=op();if(!r){started=false;if(!stay_up)ap.up=sta.up=false;}return r; }
 int esp_wifi_clear_default_wifi_driver_and_handlers(void *v) { struct esp_netif *p=v;assert(pre&&!started&&p->attached&&!p->up);int r=op();if(!r)p->attached=false;return r; }
