@@ -1,3 +1,9 @@
+# Secure NVS integration CI — 2026-11-26
+
+PR #19 merged isolated workflow pin only; target run 45740340743 in progress at checkpoint. No new firmware result yet. Verified old partition offsets and two compile-guard rejection checks.
+
+---
+
 # Experimental NVS startup integration — 2026-11-26
 
 Added dedicated network task startup, explicit disabled-by-default key selector, separate experimental partition and protected profile load into station adapter. 16/16 new mock startup cases passed. No target/hardware confirmation, phone setup or actual writes.
