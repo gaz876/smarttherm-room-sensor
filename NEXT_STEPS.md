@@ -1,3 +1,9 @@
+# Security 2 footprint build in progress — 2026-11-26
+
+Inspect run 45755803953/job 139694014961 for source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775, verify real compile/link, full logs, artifacts and exact source manifests; compare static flash/DRAM to prior build. CI PR #20 not for merge. No repeated old tests. Runtime crypto, heap/stack peaks, identity, SDK decrypted-buffer disposal, actual AP/STA/DHCP and Android client still not verified. Keep activation blocked, no automatic eFuse/OTA/heating or paid/private CI.
+
+---
+
 # Security 2 context checkpoint — 2026-11-26
 
 Continue from 74156c8be6a72b99c8a76f0921aec780d6ea307d. Context ownership mock tests complete. Review applicable SDK dependency and decrypted-buffer disposal gates, trusted per-device salt/verifier provisioning and secure storage. Implement bounded single-owner transport and endpoint/bridge binding with real response completion, no plaintext fallback; actual AP/STA cleanup, DHCP and Android client. Audit isolated target build inputs, measure link footprint before activation and confirm real Security 2 interoperability. No old test repetition or automatic eFuse/flash/OTA/heating, no paid/private CI. Context is not wired into CMake or runtime and no real Security 2 handshake has been tested.
