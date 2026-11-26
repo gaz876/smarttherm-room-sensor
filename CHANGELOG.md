@@ -1,3 +1,9 @@
+# Offline Security 2 SDK context candidate — 2026-11-26
+
+Reviewed pinned SDK APIs and transport ownership; added unlinked context wrapper and mock SDK tests at 74156c8be6a72b99c8a76f0921aec780d6ea307d. Final GCC/Clang ASan/UBSan mock tests exit 0, four published hashes match. Initial missing standard header fixed. No real crypto, transport, target build, CMake/workflow or deployment change.
+
+---
+
 # Setup model integration — 2026-11-26
 
 Added offline integration bridge and host test at 85cbc2c5b0953059281d700040fddc8c3bbcc741. Both GCC/Clang ASan/UBSan actual runs exit 0; published hashes match. Slow live check blocks write, late completed write read back without late response, explicit cleanup gates. No actual SDK/AP/STA or hardware integration, new CI or target build.
