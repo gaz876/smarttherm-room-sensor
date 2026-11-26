@@ -1,3 +1,9 @@
+# Experimental secure Wi-Fi store — 2026-11-26
+
+Added isolated explicit HMAC-backed NVS adapter, 16 actual mock SDK executions passed. No activation, partition changes, hardware or target build. Prior tests not repeated.
+
+---
+
 # Wi-Fi station CI verification and enrollment transaction — 2026-11-26
 
 Verified existing target build and archived hashes independently. Added and tested a standalone enrollment transaction with fail-closed storage gate and runtime uncertainty latch. No live networking, encrypted NVS backend, UI, deployment, or new CI. Prior tests not repeated.
