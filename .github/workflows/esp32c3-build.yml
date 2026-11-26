@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=d8aa27b2422c9338b1de5b43b3d7e368d00fc0e4
+          source_sha=4616624dd00abe44f0b2dabce2b44b657c85383d
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -63,7 +63,7 @@ jobs:
             if grep -Eq "^CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_[01]=y$" sdkconfig; then exit 1; fi
             grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
             riscv32-esp-elf-nm build/room_sensor.elf > /tmp/link-symbols.txt
-            for sym in room_sec2_transport_start room_sec2_transport_exchange room_sec2_transport_finish room_sec2_transport_destroy protocomm_security2 room_apsta_task_bind room_apsta_task_open room_apsta_task_poll room_apsta_task_packet room_apsta_task_sent room_apsta_task_close room_apsta_events_unbind room_wifi_apsta_link_bind room_wifi_apsta_link_init_missing room_wifi_identity_provider_init room_secure_identity_load; do
+            for sym in room_sec2_transport_start room_sec2_transport_exchange room_sec2_transport_finish room_sec2_transport_destroy protocomm_security2 room_apsta_task_bind room_apsta_task_open room_apsta_task_poll room_apsta_task_packet room_apsta_task_sent room_apsta_task_close room_apsta_events_unbind room_wifi_apsta_link_bind room_wifi_apsta_link_init_missing room_wifi_identity_provider_init room_secure_identity_load room_wifi_apsta_link_attach_io; do
               grep -E "[[:space:]]$sym$" /tmp/link-symbols.txt || exit 1
             done
             idf.py size | tee /tmp/size.txt
@@ -91,8 +91,8 @@ jobs:
                 timeout 15s "/tmp/room_host/$cc-wifi-idf" "$mode"
                 echo "HOST_STA_OK $cc $mode"
               done
-              "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Imain -Itests/mock_combined -Itests/mock_apsta_owner -Itests/mock_sec2_transport -Itests/mock_task -Itests/mock_events tests/test_room_wifi_combined.c main/room_wifi_idf.c tests/fixture_room_wifi_apsta_link.c main/room_apsta_session.c main/room_apsta_events.c main/room_apsta_task.c main/room_sec2_transport.c -o "/tmp/room_host/$cc-combined"
-              for scenario in normal expiry revoked notready prepare partial timeout first_normal first_late first_error first_unavailable first_valid first_changed save_ok save_lost save_write_error save_read_error save_reload_error; do
+              "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Imain -Itests/mock_combined -Itests/mock_apsta_owner -Itests/mock_sec2_transport -Itests/mock_task -Itests/mock_events tests/test_room_wifi_combined.c main/room_wifi_idf.c tests/fixture_room_wifi_apsta_link.c main/room_phone_channel.c main/room_apsta_session.c main/room_apsta_events.c main/room_apsta_task.c main/room_sec2_transport.c -o "/tmp/room_host/$cc-combined"
+              for scenario in normal expiry revoked notready prepare partial timeout first_normal first_late first_error first_unavailable first_valid first_changed save_ok save_lost save_write_error save_read_error save_reload_error channel_normal channel_open_fail channel_bad_send channel_drain; do
                 timeout 15s "/tmp/room_host/$cc-combined" "$scenario"
                 echo "HOST_COMBINED_OK $cc $scenario"
               done
