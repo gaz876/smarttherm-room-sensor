@@ -59,8 +59,11 @@ bool room_apsta_task_bind(room_apsta_task *t,QueueHandle_t queue) {
 bool room_apsta_task_open(room_apsta_task *t,phone_profile_state profile,bool boot,bool trusted,
     const room_enroll_store *store,const uint8_t *ssid,size_t n,const uint8_t *key,size_t m,
     const protocomm_security2_params_t *id,uint32_t sdk_id) {
-    if (!owned(t) || t->pending || !room_apsta_events_poll(&t->events,&t->session)) return false;
-    return room_apsta_session_open(&t->session,clock_ms,t,profile,boot,trusted,store,ssid,n,key,m,id,sdk_id);
+    if (!owned(t) || t->pending || t->session.locked || t->session.bridge.window ||
+        !trusted || !room_apsta_events_begin(&t->events)) return false;
+    bool ok=room_apsta_session_open(&t->session,clock_ms,t,profile,boot,trusted,store,ssid,n,key,m,id,sdk_id);
+    if (!ok && !t->session.bridge.window) room_apsta_events_end(&t->events);
+    return ok;
 }
 bool room_apsta_task_poll(room_apsta_task *t) {
     if (!owned(t)) return false;
@@ -78,5 +81,7 @@ bool room_apsta_task_sent(room_apsta_task *t,bool ok) {
 }
 bool room_apsta_task_close(room_apsta_task *t,bool sender_drained) {
     if (!owned(t)) return false;
-    return room_apsta_session_close(&t->session,sender_drained,barrier,t);
+    bool ok=room_apsta_session_close(&t->session,sender_drained,barrier,t);
+    if (ok) room_apsta_events_end(&t->events);
+    return ok;
 }

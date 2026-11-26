@@ -39,9 +39,13 @@ int main(void){
     const char salt[16]={0},verifier[384]={0};protocomm_security2_params_t id={salt,16,verifier,384};
     const uint8_t *out;size_t n;uint8_t hs[]={1},stage[29]={1,ROOM_SETUP_STAGE,1,8,'x','a','b','c','d','e','f','g','h'},save[26]={1,ROOM_SETUP_SAVE,0,0,0,0,0,0,0,1};
     reset();assert(room_apsta_task_bind(&t,records));assert(!room_apsta_task_bind(&t,records));
+    for(unsigned i=0;i<20;i++)handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&!atomic_load(&t.events.overflow)&&!atomic_load(&t.events.accepting));
     current=&other_id;assert(!room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));assert(!calls);
     current=&owner_id;assert(!room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,false,&store,ssid,1,key,16,&id,7));
+    assert(!atomic_load(&t.events.accepting));
     assert(room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));
+    assert(atomic_load(&t.events.accepting));
     current=&other_id;assert(!room_apsta_task_poll(&t));assert(!room_apsta_task_packet(&t,true,hs,sizeof(hs),&out,&n));assert(!out&&!n);assert(!room_apsta_task_close(&t,true));assert(!stops);
     current=&owner_id;assert(room_apsta_task_packet(&t,true,hs,sizeof(hs),&out,&n));assert(room_apsta_task_sent(&t,true));
     us=1000;assert(room_apsta_task_packet(&t,false,stage,sizeof(stage),&out,&n));assert(room_apsta_task_sent(&t,true));
@@ -62,6 +66,9 @@ int main(void){
     assert(!room_apsta_task_close(&t,true)&&stops==1&&!destroys);pre=true;deliver_barrier();
     assert(!room_apsta_task_close(&t,true)&&destroys==2&&deinits==1&&posted&&t.session.bridge.window);
     post=true;deliver_barrier();assert(room_apsta_task_close(&t,true)&&!t.session.bridge.window&&!t.pending);
+    assert(!atomic_load(&t.events.accepting));
+    for(unsigned i=0;i<20;i++)handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&!atomic_load(&t.events.overflow));
     reset();us=200000;assert(room_apsta_task_open(&t,PHONE_PROFILE_VALID,true,true,&store,ssid,1,key,16,&id,7));
     handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);assert(!room_apsta_task_poll(&t));
     assert(!room_apsta_task_close(&t,true)&&posted);us=5200000;assert(!room_apsta_task_close(&t,true)&&t.session.locked);
@@ -87,7 +94,7 @@ int main(void){
     post=true;
     for(unsigned i=0;i<9;i++)handlers[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&stale);
     deliver_barrier();assert(room_apsta_task_close(&u,true)&&!u.pending&&!count&&!u.session.bridge.window);
-    assert(atomic_load(&u.events.overflow)&&!connects&&!u.session.locked);
+    assert(atomic_load(&u.events.overflow)&&!atomic_load(&u.events.accepting)&&!connects&&!u.session.locked);
     assert(!room_apsta_task_open(&u,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));
     puts("APSTA network task mock PASS");return 0;
 }
