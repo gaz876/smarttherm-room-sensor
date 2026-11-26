@@ -1,3 +1,9 @@
+# Secure NVS target evidence and phone setup owner — 2026-11-26
+
+Verified existing target build, all archive hashes and source inputs. Added and host-tested isolated phone setup owner. No live transport, phone client, eFuse or new CI. Dependency review partial; network activation remains gated.
+
+---
+
 # Secure NVS integration CI — 2026-11-26
 
 PR #19 merged isolated workflow pin only; target run 45740340743 in progress at checkpoint. No new firmware result yet. Verified old partition offsets and two compile-guard rejection checks.

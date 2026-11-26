@@ -1,3 +1,9 @@
+# Phone setup transport checkpoint — 2026-11-26
+
+Target run 45740340743 independently verified; do not rebuild unchanged source. New phone session owner tests passed; review protected transport input/buffer lifecycle, Mbed TLS advisory applicability, per-device identity, Android client protocol and actual AP/STA ownership. Confirm flash/heap budget before adding transport. No plaintext fallback, automatic eFuse writes, hardware or unrelated test repetition.
+
+---
+
 # Target integration build pending — 2026-11-26
 
 Inspect run 45740340743/job 139643493540, all steps and full logs, exact source blobs, linked components, new partition map and independently downloaded artifact. Fix actual failure if necessary. Do not repeat old tests or flash. Continue protected phone enrollment and write integration only after applicable review; no automatic eFuse writes or plaintext fallback.
