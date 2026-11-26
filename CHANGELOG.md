@@ -1,3 +1,9 @@
+# Experimental runtime settings command — 2026-11-26
+
+Added single-owner runtime NVS save/reset/readback and ticket result, responsive I2C backoff, exact active config snapshot. Eight actual host test executions passed on GCC/Clang; no duplicate standalone I2C/GPIO tests. Target build pending; no new external dependencies, network, heating or deployment.
+
+---
+
 # Experimental NVS settings — 2026-11-26
 
 Implemented versioned measurement settings and synchronized snapshot; six final new host test executions passed (settings, mock NVS adapter and actual app with mock SDK on GCC/Clang), no repeat of standalone I2C/GPIO tests. Target source be95be3d3676c24a077a443bdf4c01c9f7309980; CI PR #13 merged, run 45729696843 success; downloaded artifact 15076615709 verified ZIP and inner manifests. App 219328 bytes, static DRAM 62426 bytes. User-facing settings save/reset, physical persistence and real task concurrency not yet verified; no production changes.

@@ -15,9 +15,19 @@ _Static_assert(ROOM_SETTINGS_MIN_MS==ROOM_MIN_INTERVAL_MS && ROOM_SETTINGS_MAX_M
 static portMUX_TYPE snapshot_lock=portMUX_INITIALIZER_UNLOCKED;
 static room_measure published;
 static room_settings_result published_settings=ROOM_SETTINGS_IO_ERROR;
-static void publish_snapshot(const room_measure *m, room_settings_result status) {
+static room_settings published_config;
+static bool runtime_ready;
+static struct {
+    uint32_t ticket;
+    room_command_state state;
+    room_settings desired;
+    bool reset;
+    room_settings_result result;
+} command;
+static void publish_snapshot(const room_measure *m, room_settings config, room_settings_result status) {
     portENTER_CRITICAL(&snapshot_lock);
     published=*m;
+    published_config=config;
     published_settings=status;
     portEXIT_CRITICAL(&snapshot_lock);
 }
@@ -28,6 +38,84 @@ room_status room_runtime_snapshot(sht40_sample *out, room_settings_result *setti
     if (settings_status) *settings_status=published_settings;
     portEXIT_CRITICAL(&snapshot_lock);
     return room_snapshot(&copy,(uint64_t)(esp_timer_get_time()/1000),out);
+}
+bool room_runtime_request_settings(room_settings desired, bool reset, uint32_t *ticket) {
+    if (!ticket || (!reset && !room_settings_valid(desired))) return false;
+    bool accepted=false;
+    portENTER_CRITICAL(&snapshot_lock);
+    if (runtime_ready && command.state!=ROOM_COMMAND_PENDING && command.ticket<UINT32_MAX) {
+        command.ticket++;
+        command.desired=desired;
+        command.reset=reset;
+        command.state=ROOM_COMMAND_PENDING;
+        *ticket=command.ticket;
+        accepted=true;
+    }
+    portEXIT_CRITICAL(&snapshot_lock);
+    return accepted;
+}
+room_command_state room_runtime_settings_result(uint32_t ticket, room_settings_result *result) {
+    room_command_state state=ROOM_COMMAND_UNKNOWN;
+    portENTER_CRITICAL(&snapshot_lock);
+    if (runtime_ready && ticket && ticket==command.ticket) {
+        state=command.state;
+        if (state==ROOM_COMMAND_DONE && result) *result=command.result;
+    }
+    portEXIT_CRITICAL(&snapshot_lock);
+    return state;
+}
+bool room_runtime_settings(room_settings *active, room_settings_result *status) {
+    if (!active) return false;
+    portENTER_CRITICAL(&snapshot_lock);
+    bool ready=runtime_ready;
+    if (ready) {
+        *active=published_config;
+        if (status) *status=published_settings;
+    }
+    portEXIT_CRITICAL(&snapshot_lock);
+    return ready;
+}
+static bool same_settings(room_settings a, room_settings b) {
+    return a.interval_ms==b.interval_ms && a.correction_mdeg==b.correction_mdeg;
+}
+/* Only the measurement owner writes NVS or changes the measurement model. */
+static void service_settings(room_measure *m, room_settings *active, room_settings defaults,
+                             room_settings_result *status, const room_settings_store *store) {
+    room_settings desired;
+    bool reset;
+    portENTER_CRITICAL(&snapshot_lock);
+    bool pending=command.state==ROOM_COMMAND_PENDING;
+    desired=command.desired;
+    reset=command.reset;
+    portEXIT_CRITICAL(&snapshot_lock);
+    if (!pending) return;
+    if (reset) desired=defaults;
+    room_settings_result result=room_settings_save(store,desired,reset);
+    if (result==ROOM_SETTINGS_OK || result==ROOM_SETTINGS_UNCHANGED) {
+        room_settings actual;
+        room_settings_result readback=room_settings_load(store,defaults,&actual);
+        if (readback!=ROOM_SETTINGS_OK || !same_settings(actual,desired)) {
+            result=readback==ROOM_SETTINGS_OK ? ROOM_SETTINGS_IO_ERROR : readback;
+            /* A missing record after an acknowledged save is not a safe default. */
+            if (result==ROOM_SETTINGS_MISSING) result=ROOM_SETTINGS_IO_ERROR;
+        } else {
+            if (!same_settings(*active,actual) || (*status!=ROOM_SETTINGS_OK && *status!=ROOM_SETTINGS_MISSING)) {
+                if (room_configure(m,actual.interval_ms,actual.correction_mdeg/1000.0))
+                    *active=actual;
+                else result=ROOM_SETTINGS_IO_ERROR;
+            }
+        }
+    }
+    /* Failed or ambiguous writes never change active settings. A later reboot may
+     * load a record actually committed before a failure was reported. */
+    *status=(result==ROOM_SETTINGS_OK || result==ROOM_SETTINGS_UNCHANGED) ? ROOM_SETTINGS_OK : result;
+    portENTER_CRITICAL(&snapshot_lock);
+    published=*m;
+    published_config=*active;
+    published_settings=*status;
+    command.result=result;
+    command.state=ROOM_COMMAND_DONE;
+    portEXIT_CRITICAL(&snapshot_lock);
 }
 static bool tx(void *ctx,uint8_t cmd) {
     return i2c_master_transmit((i2c_master_dev_handle_t)ctx,&cmd,1,50)==ESP_OK;
@@ -89,8 +177,8 @@ void app_main(void) {
     room_settings settings=defaults;
     room_settings_result settings_status=ROOM_SETTINGS_IO_ERROR;
     esp_err_t nvs_status=nvs_flash_init();
+    const room_settings_store store=room_nvs_store();
     if (nvs_status==ESP_OK) {
-        const room_settings_store store=room_nvs_store();
         settings_status=room_settings_load(&store,defaults,&settings);
     } else {
         ESP_LOGW(TAG,"NVS init failed: %d; retained partition",(int)nvs_status);
@@ -100,7 +188,12 @@ void app_main(void) {
     room_init(&m);
     if (!room_configure(&m,settings.interval_ms,settings.correction_mdeg/1000.0) ||
         !ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL)) { ESP_LOGE(TAG,"Invalid configuration"); return; }
-    publish_snapshot(&m,settings_status);
+    publish_snapshot(&m,settings,settings_status);
+    portENTER_CRITICAL(&snapshot_lock);
+    command.ticket=0;
+    command.state=ROOM_COMMAND_UNKNOWN;
+    runtime_ready=true;
+    portEXIT_CRITICAL(&snapshot_lock);
     sensor_i2c sensor={
         .cfg={.i2c_port=I2C_NUM_0,.sda_io_num=CONFIG_ROOM_I2C_SDA,
             .scl_io_num=CONFIG_ROOM_I2C_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7},
@@ -108,18 +201,21 @@ void app_main(void) {
     room_i2c_retry retry={0};
     const room_i2c_ops ops={&sensor,create_bus,add_device,reset_bus,remove_device,delete_bus};
     room_bus io={NULL,tx,rx,wait_ms,now_ms};
+    uint64_t retry_at=0;
     for (;;) {
+        service_settings(&m,&settings,defaults,&settings_status,nvs_status==ESP_OK ? &store : NULL);
         if (!retry.ready) {
+            if (now_ms(NULL)<retry_at) { wait_ms(NULL,50); continue; }
             uint32_t delay=room_i2c_prepare(&retry,&ops);
-            if (delay) { wait_ms(NULL,delay); continue; }
+            if (delay) { retry_at=now_ms(NULL)+delay; wait_ms(NULL,50); continue; }
             room_init(&m);
             if (!room_configure(&m,settings.interval_ms,settings.correction_mdeg/1000.0)) return;
-            publish_snapshot(&m,settings_status);
+            publish_snapshot(&m,settings,settings_status);
             io.ctx=sensor.dev;
             ESP_LOGI(TAG,"I2C ready; awaiting valid measurement");
         }
         bool attempted=room_poll(&m,&io);
-        publish_snapshot(&m,settings_status);
+        publish_snapshot(&m,settings,settings_status);
         if (attempted) {
             sht40_sample s;
             room_status status=room_snapshot(&m,now_ms(NULL),&s);
@@ -129,7 +225,8 @@ void app_main(void) {
             if (delay) {
                 io.ctx=NULL;
                 ESP_LOGW(TAG,"I2C recovery scheduled");
-                wait_ms(NULL,delay);
+                retry_at=now_ms(NULL)+delay;
+                wait_ms(NULL,50);
                 continue;
             }
         }
