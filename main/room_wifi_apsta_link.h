@@ -20,4 +20,7 @@ typedef struct {
     bool (*prepare)(void *,room_wifi_apsta_window *);
 } room_wifi_apsta_provider;
 bool room_wifi_apsta_link_bind(room_wifi_apsta_provider);
+/* Optional first-boot candidate. Protected store must already be initialized;
+ * a missing record is checked independently of the caller. No default call. */
+bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider);
 #endif

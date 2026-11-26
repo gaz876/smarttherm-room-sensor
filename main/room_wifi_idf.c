@@ -18,7 +18,7 @@ static struct {
     room_wifi_setup_io setup_io;
     TaskHandle_t task;
     uint64_t cleanup_deadline;
-    bool bind_attempted, bound, apsta;
+    bool bind_attempted, bound, apsta, stepped, automatic;
     wifi_config_t config;
     esp_netif_t *netif;
     uint64_t session;
@@ -33,7 +33,7 @@ bool room_wifi_idf_is_owner(void) {
 }
 bool room_wifi_idf_bind_setup(room_wifi_setup_io io) {
     if (!room_wifi_idf_is_owner() || w.fatal || w.bind_attempted ||
-        w.owner.generation || w.owner.dirty || w.driver || w.netif ||
+        w.stepped || w.owner.generation || w.owner.dirty || w.driver || w.netif ||
         !io.bind || !io.ready || !io.start || !io.poll || !io.stop || !io.load) return false;
     w.bind_attempted=true;
     if (!io.bind(io.ctx)) return false;
@@ -139,7 +139,7 @@ static bool setup(void *ctx,uint64_t token) {
         now_ms()>=w.owner.policy.deadline || !w.setup_io.ready(w.setup_io.ctx)) return false;
     /* Claim the mode before calling start, even if start later fails. */
     w.apsta=true;
-    return w.setup_io.start(w.setup_io.ctx,w.owner.policy.deadline);
+    return w.setup_io.start(w.setup_io.ctx,w.owner.policy.deadline,w.owner.policy.profile,!w.automatic);
 }
 static bool profile_valid(const uint8_t *ssid,size_t n,const uint8_t *pass,size_t m) {
     if (!ssid || !pass || !n || n>32 || m<8 || m>63) return false;
@@ -147,8 +147,9 @@ static bool profile_valid(const uint8_t *ssid,size_t n,const uint8_t *pass,size_
     for (size_t i=0;i<m;i++) if (pass[i]<32 || pass[i]>126) return false;
     return true;
 }
-bool room_wifi_idf_init(const uint8_t *ssid,size_t n,const uint8_t *pass,size_t m) {
-    if (w.once || !profile_valid(ssid,n,pass,m)) return false;
+static bool init(room_wifi_profile profile,const uint8_t *ssid,size_t n,const uint8_t *pass,size_t m) {
+    if (w.once || (profile!=ROOM_WIFI_PROFILE_MISSING &&
+        (profile!=ROOM_WIFI_PROFILE_VALID || !profile_valid(ssid,n,pass,m)))) return false;
     w.once=true; w.task=xTaskGetCurrentTaskHandle();
     if (!w.task) return false;
     /* Exclusive networking owner. Existing default loop is not accepted. */
@@ -156,10 +157,16 @@ bool room_wifi_idf_init(const uint8_t *ssid,size_t n,const uint8_t *pass,size_t 
         .pull_up_en=GPIO_PULLUP_ENABLE,.pull_down_en=GPIO_PULLDOWN_DISABLE,.intr_type=GPIO_INTR_DISABLE};
     if (gpio_config(&gpio)!=ESP_OK || esp_netif_init()!=ESP_OK || esp_event_loop_create_default()!=ESP_OK ||
         esp_event_handler_register(ROOM_WIFI_BARRIER,0,barrier_handler,NULL)!=ESP_OK) return false;
-    configure(ssid,n,pass,m);
-    wifi_owner_init(&w.owner,(room_wifi_transport){NULL,stop,station,setup},ROOM_WIFI_PROFILE_VALID,now_ms(),false);
+    if (profile==ROOM_WIFI_PROFILE_VALID) configure(ssid,n,pass,m);
+    wifi_owner_init(&w.owner,(room_wifi_transport){NULL,stop,station,setup},profile,now_ms(),false);
     w.ready=true;
     return true;
+}
+bool room_wifi_idf_init(const uint8_t *ssid,size_t n,const uint8_t *pass,size_t m) {
+    return init(ROOM_WIFI_PROFILE_VALID,ssid,n,pass,m);
+}
+bool room_wifi_idf_init_missing(void) {
+    return init(ROOM_WIFI_PROFILE_MISSING,NULL,0,NULL,0);
 }
 static room_wifi_event observe(void) {
     if (!w.session || !w.netif) return (room_wifi_event){0};
@@ -181,6 +188,18 @@ bool room_wifi_idf_step(bool *manual_request) {
     bool manual=wifi_boot_sample(&w.button,gpio_get_level(GPIO_NUM_9)==0,now);
     if (manual_request) *manual_request=manual;
     bool ready=w.bound && w.setup_io.ready(w.setup_io.ctx);
+    /* One boot opportunity, consumed even when identity/store is unavailable.
+     * No deferred automatic AP when readiness later changes. */
+    if (!w.stepped) {
+        w.stepped=true;
+        if (ready && w.owner.policy.profile==ROOM_WIFI_PROFILE_MISSING &&
+            now!=UINT64_MAX) {
+            w.automatic=true;
+            wifi_owner_action(&w.owner,wifi_setup(&w.owner.policy,now,true),now);
+            w.automatic=false;
+            return false;
+        }
+    }
     if (w.apsta && w.owner.active &&
         (!ready || !w.setup_io.poll(w.setup_io.ctx)))
         event=(room_wifi_event){WIFI_EVENT_SETUP_ABORTED,w.owner.active};

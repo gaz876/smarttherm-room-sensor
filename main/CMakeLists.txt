@@ -15,4 +15,5 @@ target_link_libraries(${COMPONENT_LIB} INTERFACE
     "-Wl,-u,room_apsta_task_sent"
     "-Wl,-u,room_apsta_task_close"
     "-Wl,-u,room_apsta_events_unbind"
-    "-Wl,-u,room_wifi_apsta_link_bind")
+    "-Wl,-u,room_wifi_apsta_link_bind"
+    "-Wl,-u,room_wifi_apsta_link_init_missing")

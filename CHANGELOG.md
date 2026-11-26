@@ -1,3 +1,12 @@
+# 2026-11-26 — Protected missing-profile first boot candidate
+
+- Added optional missing-profile initialization in the single network owner and actual APSTA link. It independently reads the already-initialized protected store before initializing and again before opening a missing-profile setup window. Valid, corrupt, unavailable records never authorize automatic setup. Exactly one automatic opportunity on the first owner step; readiness arriving later cannot open AP until a physical BOOT gesture. The link passes missing/valid profile and physical authorization explicitly to the existing session policy. The ordinary valid-profile STA startup remains unchanged, with no provider or live listener.
+- Added six new shared-driver test cases: first_normal, first_late, first_error, first_unavailable, first_valid, first_changed; tests check first-window expiry, no automatic reopen, physical reopen and no connection without a stored profile. Candidate not built or tested yet. Authenticated save-to-STA from a missing profile is NOT wired; identity provider, sender lifetime, physical validation and phone transport remain blockers.
+- Previous source 92b1d4156ec5d3fdc6074a22af88853723ab69ae passed 16 GCC ASan/UBSan scenarios and ESP32-C3 build in 45780310660, artifact 15098680102, digest 6f8d1ea09a6c68c009c9994e7c9ffe44313ca3977930251ae2e2ec84af3683cd (CI digest, independent verification pending). Clang absent.
+- No eFuse/key generation, startup activation, protected branch merge, deployment, paid CI or Cloudflare changes.
+
+---
+
 # 2026-11-26 — Combined real-adapter host integration fixture
 
 - Added a shared SDK mock for actual room_wifi_idf, room_wifi_apsta_link, room_apsta_task, events, session and Security2 transport adapter; the cryptographic SDK remains a synthetic mock, no network/phone traffic. The single driver mock asserts exclusive init, complete cleanup and barrier order. Six independent process cases: disconnect, expiry, revoked readiness, unavailable provider, rejected prepare and partial AP start; seventh case stalls STA cleanup and confirms quarantine. The test also checks protected profile reload and disabled AP event capture during STA.

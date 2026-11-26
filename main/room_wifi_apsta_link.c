@@ -22,9 +22,18 @@ static bool ready(void *ctx) {
         !atomic_load(&a.task.events.overflow) &&
         enroll_ready(&a.store) && a.provider.ready(a.provider.ctx);
 }
-static bool start(void *ctx,uint64_t deadline) {
+static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool physical_boot) {
     (void)ctx;
-    if (now_ms()>=deadline || !ready(NULL)) return false;
+    if (now_ms()>=deadline || !ready(NULL) ||
+        (profile!=ROOM_WIFI_PROFILE_VALID && profile!=ROOM_WIFI_PROFILE_MISSING) ||
+        (!physical_boot && profile!=ROOM_WIFI_PROFILE_MISSING)) return false;
+    if (profile==ROOM_WIFI_PROFILE_MISSING) {
+        room_enroll_profile check={0};
+        room_secure_status status=room_secure_load(&check);
+        enroll_wipe(&check,sizeof(check));
+        if (status!=ROOM_SEC_MISSING) return false;
+    }
+    phone_profile_state phone_profile=profile==ROOM_WIFI_PROFILE_MISSING?PHONE_PROFILE_MISSING:PHONE_PROFILE_VALID;
     room_wifi_apsta_window p={0};
     bool ok=a.provider.prepare(a.provider.ctx,&p) && ready(NULL) &&
         now_ms()<deadline && p.key_len>=16 &&
@@ -32,7 +41,7 @@ static bool start(void *ctx,uint64_t deadline) {
         p.identity && p.identity->salt && p.identity->salt_len>=8 &&
         p.identity->salt_len<=64 && p.identity->verifier &&
         p.identity->verifier_len==384 && p.sdk_id && p.sdk_id!=UINT32_MAX &&
-        room_apsta_task_open(&a.task,PHONE_PROFILE_VALID,true,true,&a.store,
+        room_apsta_task_open(&a.task,phone_profile,physical_boot,true,&a.store,
             p.ssid,p.ssid_len,p.key,p.key_len,p.identity,p.sdk_id);
     enroll_wipe(&p,sizeof(p));
     if (ok && a.task.session.bridge.phone.deadline>deadline)
@@ -60,4 +69,13 @@ bool room_wifi_apsta_link_bind(room_wifi_apsta_provider provider) {
     if (!room_wifi_idf_is_owner() || a.attempted || !provider.ready || !provider.prepare) return false;
     a.attempted=true; a.provider=provider;
     return room_wifi_idf_bind_setup((room_wifi_setup_io){NULL,bind,ready,start,poll,stop,load});
+}
+
+bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider provider) {
+    if (!provider.ready || !provider.prepare || a.attempted || room_wifi_idf_is_owner()) return false;
+    room_enroll_profile p={0};
+    room_secure_status status=room_secure_load(&p);
+    enroll_wipe(&p,sizeof(p));
+    if (status!=ROOM_SEC_MISSING) return false;
+    return room_wifi_idf_init_missing() && room_wifi_apsta_link_bind(provider);
 }

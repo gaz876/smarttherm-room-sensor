@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "room_wifi_enrollment.h"
+#include "room_wifi_policy.h"
 
 /* Internal experimental adapter. Bind once, in the network task, before
  * the first STA start. No callbacks from the phone or default event loop.
@@ -13,7 +14,7 @@ typedef struct {
     void *ctx;
     bool (*bind)(void *);
     bool (*ready)(void *);
-    bool (*start)(void *,uint64_t deadline);
+    bool (*start)(void *,uint64_t deadline,room_wifi_profile,bool physical_boot);
     bool (*poll)(void *);
     bool (*stop)(void *);
     bool (*load)(void *,room_enroll_profile *);
@@ -25,5 +26,8 @@ bool room_wifi_idf_bind_setup(room_wifi_setup_io);
  * The default startup path remains STA-only. The optional setup binding
  * is not called by production startup. */
 bool room_wifi_idf_init(const uint8_t *ssid,size_t ssid_len,const uint8_t *pass,size_t pass_len);
+/* Internal experimental entry: only for a confirmed missing protected
+ * profile. No radio start until the first owner step with a bound provider. */
+bool room_wifi_idf_init_missing(void);
 bool room_wifi_idf_step(bool *manual_request);
 #endif
