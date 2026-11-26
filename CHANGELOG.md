@@ -1,3 +1,9 @@
+# Runtime NVS build and integration — 2026-11-26
+
+PR #14 merged to dev 759921b744300f304830292ca35060011c867de6 after actual target run 45730901218 and independent artifact 15077320314 verification (20 files, checksums, all 14 inputs). No source differences after merge. App 220256 bytes, static DRAM 62458. No repeat host tests or hardware use.
+
+---
+
 # Experimental runtime settings command — 2026-11-26
 
 Added single-owner runtime NVS save/reset/readback and ticket result, responsive I2C backoff, exact active config snapshot. Eight actual host test executions passed on GCC/Clang; no duplicate standalone I2C/GPIO tests. Target build pending; no new external dependencies, network, heating or deployment.
