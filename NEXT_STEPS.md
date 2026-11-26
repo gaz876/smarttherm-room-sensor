@@ -1,3 +1,33 @@
+# ESP32-C3 I2C recovery target build verified — 2026-11-26
+
+Target compilation and artifact verification complete for 598f896a1d3e0ca3d66b0b2674f9eee31528214e. Integrate reviewed PR #11 into dev; verify resulting source blobs unchanged. Next: versioned validated NVS measurement settings with persistent correction/interval, explicit reset, synchronized freshness, then Wi-Fi provisioning and MQTT protocol compatibility. Retain previous tests; run new relevant tests only. Complete full applicable dependency/SBOM review before stable release and bench verify GPIO/pull-ups and physical I2C recovery before use. No flash, heating control, OTA or paid CI.
+
+---
+
+# Public artifact CI enabled — 2026-11-26
+
+Inspect run 45727766399 / job 139601840682 when terminal. Check actual compilation, every step, logs, source blobs, linked components, partition table, artifact digest and ZIP contents/inner SHA256. PR #11 remains draft until target evidence reviewed. Complete applicable advisory review before stable release. Next functional phase: versioned validated NVS measurement settings, single-record commit, no writes on each measurement, preserve existing settings on recovery, synchronized fresh snapshot. No blanket NVS erase on init failure; keep factory reset explicit. Existing host I2C/GPIO tests need not be repeated without relevant code changes. No hardware flash/OTA or heating work.
+
+---
+
+# Independent GPIO and artifact preparation retest — 2026-11-26
+
+Host regression at fixed GPIO source 598f896a1d3e0ca3d66b0b2674f9eee31528214e now independently complete; do not repeat solely for evidence. PRs #10/#11 remain experimental/draft. Remaining: applicable upload/SDK dependency audit and administrative review, actual target build, archive and inner-file verification, separate reviewed SBOM generation, bench confirmation of board/pull-ups and I2C recovery. No flash, production deployment, OTA, heating changes or private/paid CI.
+
+---
+
+# Provisional SuperMini GPIO profile and artifact CI preparation — 2026-11-26
+
+Review PRs #10/#11 at pinned source 598f896a1d3e0ca3d66b0b2674f9eee31528214e and workflow 416ad8810712e2c1c10a2175d6443c617cc217a6. Complete applicable upload action and SDK dependency review and administrative gate before enabling workflow. Then actual target compile, archive download and independent checksum/content verification; separate reviewed SBOM generation. Full host regression rerun on exact source, bench confirm board revision, 3.3 V pull-ups and physical I2C recovery. No flash, production/OTA, heating or paid/private CI. Revert experimental changes by reviewed commit, not history rewrite.
+
+---
+
+# I2C recovery candidate — 2026-11-26
+
+Review experimental source bd67087c9107a9056214fe1e6d008012318a2a64 before integration into dev. Complete artifact workflow and applicable build audit, then target-build this exact source and inspect retained evidence. Hardware tests: startup init errors, unplug/reconnect, stuck SDA/SCL, cleanup failure, repeated recovery, actual cadence, stale sample suppression, resource/heap and task-watchdog checks. Verify GPIO/pull-ups for board separately; no hardware deployment before approval. Existing audit/OTA/network gates and heating freeze remain. No extra paid/private CI.
+
+---
+
 # First successful ESP32-C3 target build — verified 2026-11-26
 
 Baseline target compilation now confirmed; do not repeat solely for another green status. Finish installed dependency/advisory review and exact linked-component inventory. Prepare separately audited limited experimental artifact retention, with explicit source/SDK provenance and SHA256 manifest; verify ZIP and inner binaries after download. Then review recoverable I2C init, board pin constraints, persistent configuration and synchronized freshness; hardware testing remains mandatory before use. Keep MINIMAL_BUILD and OTA partition changes separate and reviewed. No flash, live heating, production deployment or private/paid CI. Existing source pin 08f487175b6995864285e420a72f0092a102c68f; workflow main f7d7fe764ed6d09a195ed349cd17a15b9180044a.

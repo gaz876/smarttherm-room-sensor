@@ -1,10 +1,13 @@
 #include "room_measure.h"
+#include "room_i2c_retry.h"
+#include "room_board.h"
 #include "driver/i2c_master.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
+_Static_assert(ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL), "invalid I2C pin mapping");
 static const char *TAG="room_sensor";
 static bool tx(void *ctx,uint8_t cmd) {
     return i2c_master_transmit((i2c_master_dev_handle_t)ctx,&cmd,1,50)==ESP_OK;
@@ -19,29 +22,80 @@ static void wait_ms(void *ctx,uint32_t ms) {
     const TickType_t ticks=(TickType_t)(((uint64_t)ms*configTICK_RATE_HZ+999)/1000+1);
     vTaskDelay(ticks);
 }
+typedef struct {
+    i2c_master_bus_config_t cfg;
+    i2c_device_config_t device;
+    i2c_master_bus_handle_t bus;
+    i2c_master_dev_handle_t dev;
+} sensor_i2c;
+static bool checked(esp_err_t err, const char *operation) {
+    if (err==ESP_OK) return true;
+    ESP_LOGW(TAG,"I2C %s failed: %d",operation,(int)err);
+    return false;
+}
+static bool create_bus(void *ctx) {
+    sensor_i2c *s=ctx;
+    i2c_master_bus_handle_t bus=NULL;
+    if (!checked(i2c_new_master_bus(&s->cfg,&bus),"create bus")) return false;
+    s->bus=bus;
+    return true;
+}
+static bool add_device(void *ctx) {
+    sensor_i2c *s=ctx;
+    i2c_master_dev_handle_t dev=NULL;
+    if (!checked(i2c_master_bus_add_device(s->bus,&s->device,&dev),"add device")) return false;
+    s->dev=dev;
+    return true;
+}
+static void reset_bus(void *ctx) {
+    sensor_i2c *s=ctx;
+    (void)checked(i2c_master_bus_reset(s->bus),"reset bus");
+}
+static bool remove_device(void *ctx) {
+    sensor_i2c *s=ctx;
+    if (!checked(i2c_master_bus_rm_device(s->dev),"remove device")) return false;
+    s->dev=NULL;
+    return true;
+}
+static bool delete_bus(void *ctx) {
+    sensor_i2c *s=ctx;
+    if (!checked(i2c_del_master_bus(s->bus),"delete bus")) return false;
+    s->bus=NULL;
+    return true;
+}
 void app_main(void) {
     room_measure m;
     room_init(&m);
     if (!room_configure(&m,CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0.0) ||
-        CONFIG_ROOM_I2C_SDA==CONFIG_ROOM_I2C_SCL) { ESP_LOGE(TAG,"Invalid configuration"); return; }
-    i2c_master_bus_config_t cfg={.i2c_port=I2C_NUM_0,
-        .sda_io_num=CONFIG_ROOM_I2C_SDA,.scl_io_num=CONFIG_ROOM_I2C_SCL,
-        .clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7};
-    i2c_master_bus_handle_t bus=NULL;
-    i2c_master_dev_handle_t dev=NULL;
-    i2c_device_config_t device={.dev_addr_length=I2C_ADDR_BIT_LEN_7,
-        .device_address=0x44,.scl_speed_hz=100000};
-    if (i2c_new_master_bus(&cfg,&bus)!=ESP_OK) { ESP_LOGE(TAG,"I2C bus init failed"); return; }
-    if (i2c_master_bus_add_device(bus,&device,&dev)!=ESP_OK) {
-        ESP_LOGE(TAG,"I2C device init failed"); (void)i2c_del_master_bus(bus); return;
-    }
-    room_bus io={dev,tx,rx,wait_ms,now_ms};
+        !ROOM_I2C_PINS_VALID(CONFIG_ROOM_I2C_SDA, CONFIG_ROOM_I2C_SCL)) { ESP_LOGE(TAG,"Invalid configuration"); return; }
+    sensor_i2c sensor={
+        .cfg={.i2c_port=I2C_NUM_0,.sda_io_num=CONFIG_ROOM_I2C_SDA,
+            .scl_io_num=CONFIG_ROOM_I2C_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7},
+        .device={.dev_addr_length=I2C_ADDR_BIT_LEN_7,.device_address=0x44,.scl_speed_hz=100000}};
+    room_i2c_retry retry={0};
+    const room_i2c_ops ops={&sensor,create_bus,add_device,reset_bus,remove_device,delete_bus};
+    room_bus io={NULL,tx,rx,wait_ms,now_ms};
     for (;;) {
+        if (!retry.ready) {
+            uint32_t delay=room_i2c_prepare(&retry,&ops);
+            if (delay) { wait_ms(NULL,delay); continue; }
+            room_init(&m);
+            if (!room_configure(&m,CONFIG_ROOM_SAMPLE_INTERVAL_S*1000u,0.0)) return;
+            io.ctx=sensor.dev;
+            ESP_LOGI(TAG,"I2C ready; awaiting valid measurement");
+        }
         if (room_poll(&m,&io)) {
             sht40_sample s;
             room_status status=room_snapshot(&m,now_ms(NULL),&s);
             if (status==ROOM_OK) ESP_LOGI(TAG,"T=%.2f C RH=%.2f %%",s.temperature,s.humidity);
             else ESP_LOGW(TAG,"No valid measurement: %d",(int)status);
+            uint32_t delay=room_i2c_observe(&retry,status==ROOM_OK,status==ROOM_IO_ERROR);
+            if (delay) {
+                io.ctx=NULL;
+                ESP_LOGW(TAG,"I2C recovery scheduled");
+                wait_ms(NULL,delay);
+                continue;
+            }
         }
         wait_ms(NULL,50);
     }

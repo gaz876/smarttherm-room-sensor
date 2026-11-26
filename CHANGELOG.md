@@ -1,3 +1,33 @@
+# ESP32-C3 I2C recovery target build verified — 2026-11-26
+
+Run 45727766399 SUCCESS; downloaded artifact 15074763831 independently verified (20 files, ZIP and inner checksums). ESP32-C3 image and GPIO profile confirmed; no hardware or production changes. No repeated I2C/GPIO host tests.
+
+---
+
+# Public artifact CI enabled — 2026-11-26
+
+Reviewed and merged standalone workflow PR #10; main f0e9604476b9f26785fda453da1619a1399418a8, run 45727766399 / job 139601840682 started. New firmware and downloadable artifacts not yet verified. Dependency advisory findings recorded; no host-test repetition or production changes.
+
+---
+
+# Independent GPIO and artifact preparation retest — 2026-11-26
+
+Eight actual host test executions, 20 compile-time cases, exact workflow syntax and six synthetic export cases passed on fixed GPIO source 598f896a1d3e0ca3d66b0b2674f9eee31528214e / workflow 416ad8810712e2c1c10a2175d6443c617cc217a6. No new functional change, CI or hardware use.
+
+---
+
+# Provisional SuperMini GPIO profile and artifact CI preparation — 2026-11-26
+
+GPIO mapping restricted to SDA4/SCL5; two actual host GPIO runs and 14 static-assert compilation cases passed. Artifact candidate now pins new source and verifies copied binary hashes; five actual synthetic export tests passed. Both PRs remain draft. No new CI or target/board verification.
+
+---
+
+# I2C recovery candidate — 2026-11-26
+
+At bd67087c9107a9056214fe1e6d008012318a2a64 added reusable retry state, ESP-IDF adapter changes and host regression. Six real host test runs passed on GCC/Clang; ten local blobs match. Experimental only; no target build, hardware or production use.
+
+---
+
 # First successful ESP32-C3 target build — verified 2026-11-26
 
 Run 45632347131 / job 139268608712 SUCCESS. Verified actual target compilation, 1003/1003 Ninja steps, generated BIN/ELF/MAP, partition table, output sizes and runner checksums in full log. Nine input blobs match dev; no downloadable artifacts retained. Documentation only.
