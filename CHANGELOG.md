@@ -1,3 +1,9 @@
+# Phone request framing candidate — 2026-11-26
+
+Added structural request parser and isolated host test at 8f742d170bb8664dacc96013f60da39c20e0bef7. GCC and Clang ASan/UBSan runs passed, 65536 length combinations each; both published blobs match. No transport, credentials, firmware build or deployment. Existing archive hashes rechecked locally. PR #17 remains draft.
+
+---
+
 # Secure NVS target evidence and phone setup owner — 2026-11-26
 
 Verified existing target build, all archive hashes and source inputs. Added and host-tested isolated phone setup owner. No live transport, phone client, eFuse or new CI. Dependency review partial; network activation remains gated.
