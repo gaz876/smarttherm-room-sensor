@@ -1,3 +1,9 @@
+# Dual-netif AP/STA owner checkpoint — 2026-11-26
+
+Continue from 6ba25177d679fb0fd5fa24596b173071d0810a23. Next bind exclusive network task, actual event barriers and bounded cleanup deadline, independent fresh DHCP event proof, bridge/transport lifecycle and trusted identity. Do not expose AP or credentials until applicable SDK buffer disposal and dependency gates reviewed. Target compile/build after relevant linked integration. Queue retained: initial phone setup, protected NVS hardware recovery/confidentiality, dynamic heap/stack measurement and MQTT compatibility/broker. One trial per window provisional; improve retry only after safe isolation. No old test repetition, automatic eFuse/OTA/heating, paid/private CI or main merge.
+
+---
+
 # AP/STA and runtime diagnostics checkpoint — 2026-11-26
 
 Continue from 9a39e7bb984fd7e73694c2ad241169e525dcb583. New isolated APSTA configuration and memory probe tests complete. Next exclusive dual-netif owner and start/stop/drain integration, actual fresh DHCP and AP channel migration, trusted per-device identity and SDK decrypted-buffer disposal, approved bounded transport and phone client. Hardware gates: real protected NVS power-cycle/error recovery and flash confidentiality, runtime internal heap/stack low-water and largest block through handshake/trial/cleanup. No automatic eFuse/OTA/heating or plaintext fallback. MQTT preliminary author code confirms incoming numeric indoor/outdoor callbacks, but exact deployed topic/QoS/retain/staleness must be pinned and broker candidate audited before implementation. No unrelated tests or target build until relevant linked change. Prior validated artifact 15087259482; PR #20 draft not merged.
