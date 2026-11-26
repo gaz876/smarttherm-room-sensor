@@ -1,3 +1,9 @@
+# Offline Security 2 packet binding — 2026-11-26
+
+Added direct SDK adapter and mock integration test; both actual GCC/Clang ASan/UBSan runs pass, five published hashes match. Experimental target source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775 includes uncalled link retention and Security 2 only. Dedicated PR #20 run 45755803953 started, result pending. No real transport/AP, credentials or deployment.
+
+---
+
 # Offline Security 2 SDK context candidate — 2026-11-26
 
 Reviewed pinned SDK APIs and transport ownership; added unlinked context wrapper and mock SDK tests at 74156c8be6a72b99c8a76f0921aec780d6ea307d. Final GCC/Clang ASan/UBSan mock tests exit 0, four published hashes match. Initial missing standard header fixed. No real crypto, transport, target build, CMake/workflow or deployment change.
