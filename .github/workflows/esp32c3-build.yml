@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=c5a7f63629ba9df7f879106e59f4f19643694b06
+          source_sha=92b1d4156ec5d3fdc6074a22af88853723ab69ae
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -90,6 +90,11 @@ jobs:
               for mode in attach start handoff; do
                 timeout 15s "/tmp/room_host/$cc-wifi-idf" "$mode"
                 echo "HOST_STA_OK $cc $mode"
+              done
+              "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Imain -Itests/mock_combined -Itests/mock_apsta_owner -Itests/mock_sec2_transport -Itests/mock_task -Itests/mock_events tests/test_room_wifi_combined.c main/room_wifi_idf.c main/room_wifi_apsta_link.c main/room_apsta_session.c main/room_apsta_events.c main/room_apsta_task.c main/room_sec2_transport.c -o "/tmp/room_host/$cc-combined"
+              for scenario in normal expiry revoked notready prepare partial timeout; do
+                timeout 15s "/tmp/room_host/$cc-combined" "$scenario"
+                echo "HOST_COMBINED_OK $cc $scenario"
               done
               for t in session events task; do
                 extra=()
