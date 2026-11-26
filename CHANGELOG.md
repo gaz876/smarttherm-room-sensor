@@ -1,3 +1,9 @@
+# Wi-Fi transport owner — 2026-11-26
+
+Added and tested generation-aware transport lifecycle and BOOT gesture. Two actual host runs passed. No firmware or hardware changes.
+
+---
+
 # Wi-Fi policy experiment — 2026-11-26
 
 Standalone policy and two passed host runs; no target networking or firmware integration. See docs/WIFI_POLICY.md.

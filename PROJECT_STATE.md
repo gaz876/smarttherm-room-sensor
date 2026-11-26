@@ -1,3 +1,9 @@
+# Wi-Fi transport owner and BOOT gesture — 2026-11-26
+
+Added SDK-independent single-owner transport adapter with monotonic generation tokens, deadline-first handling, immediate online invalidation, stop/drain before a new attempt, retry cleanup on failure, partial-start cleanup and fail-closed token exhaustion. BOOT gesture requires stable release after boot, 50 ms debounce and 3 s hold (provisional). Actual GCC 14.2.0 and Clang 17.0.0 strict C11 UBSan host runs exit 0; old policy blob c54bd7ee5916dbc050e4199dce58bb10d2000e06 matched local; new tested owner ded8206641a16fd98bbe4243347696a8ea7815ec, test 8db32f6debfde00b2a858f4c5b07ce4b837d7f9c. Real SDK event generation/stop barrier, GPIO9 wiring, DHCP, provisioning and credentials not implemented here. No new dependencies or real network activity; no unrelated tests repeated.
+
+---
+
 # Wi-Fi policy experiment — 2026-11-26
 
 Autonomous policy only; no SDK network integration. Two actual GCC 14.2.0 / Clang 17.0.0 strict C11 UBSan executions exit 0; each simulates 10000 failed connections, missing/corrupt profile, authorized setup, expiry, DHCP timeout and retry, manual request, persistence gate and stale events in nonmatching states. Local tested blobs c54bd7ee5916dbc050e4199dce58bb10d2000e06 / 950d3f6d3cdde19b4766c072d54085168167574f. No repeat NVS/I2C/GPIO tests. Provisional 5 min setup, 30 s connect timeout, 1–60 s retry. Actual SDK event generation, credential storage, BOOT and real Wi-Fi unimplemented; see docs/WIFI_POLICY.md. No new dependencies/workflows, credentials, heating or OTA.

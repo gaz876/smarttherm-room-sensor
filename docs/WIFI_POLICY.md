@@ -1,3 +1,9 @@
+# Transport owner checkpoint — 2026-11-26
+
+`src/room_wifi_owner.h` provides the single-owner lifecycle and BOOT gesture. Transport callbacks must return true from stop only once the previous event source is quiescent; this is a contract, not yet proven for ESP-IDF. Events have producer-bound generation IDs; deadline wins, cleanup failures block new starts, and setup success is only a trusted verified persistence event. BOOT starts disarmed and requires stable release before a 3 s hold (50 ms debounce). GPIO9 physical binding and strapping still need bench verification. Run the new test with GCC/Clang using the command below replacing test_room_wifi_policy.c with test_room_wifi_owner.c. Official SDK references reviewed for Wi-Fi station events and provisioning (v5.5.6), GPIO9 strapping and default event loop; network transport not enabled.
+
+---
+
 # Wi-Fi policy (experimental, not yet connected to ESP-IDF)
 
 Single owner, monotonic millisecond clock. Policy alone performs no I/O, stores no credentials, starts no real AP, and does not alter the measurement loop. Startup with confirmed missing profile (not generic read errors) may request protected setup only if a device-local authorization mechanism is ready. Valid profile starts station; error stays off. One debounced physical BOOT gesture can request setup. Setup window 5 min, connection/IP timeout 30 s; retry 1, 2, 4, 8, 16, 32, 60 s capped indefinitely, reset after IP. These are provisional engineering defaults, not user-approved final values. No AP on loss of connectivity, even for wrong password. Setup expiry restores prior valid profile or stays off; only verified persisted configuration marks setup complete.
