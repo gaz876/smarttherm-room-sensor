@@ -1,3 +1,9 @@
+# Experimental NVS startup integration — 2026-11-26
+
+Added dedicated network task startup, explicit disabled-by-default key selector, separate experimental partition and protected profile load into station adapter. 16/16 new mock startup cases passed. No target/hardware confirmation, phone setup or actual writes.
+
+---
+
 # Experimental secure Wi-Fi store — 2026-11-26
 
 Added isolated explicit HMAC-backed NVS adapter, 16 actual mock SDK executions passed. No activation, partition changes, hardware or target build. Prior tests not repeated.

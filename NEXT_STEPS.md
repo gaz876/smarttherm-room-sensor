@@ -1,3 +1,9 @@
+# Secure NVS startup integration checkpoint — 2026-11-26
+
+Build exact experimental integration for ESP32-C3 after applicable isolated CI audit. Verify binary size, linked dependency closure and partition offsets; no flash. Continue authenticated phone setup, trusted per-device identity and write/recovery integration. Default key -1 disables Wi-Fi; do not choose or generate hardware key without explicit approval and verified device state. No unrelated test repetition.
+
+---
+
 # Secure store candidate checkpoint — 2026-11-26
 
 New isolated store mock tests pass. Review SDK partition ownership and boot recovery; prove actual protected per-device key and separate partition layout, choose trusted first enrollment method, implement authenticated phone transport and integrate dedicated network task. Keep actual activation blocked without prerequisites. Target compile and linked dependency audit still pending. No eFuse generation, plaintext fallback, erase, deployment, or unrelated tests.

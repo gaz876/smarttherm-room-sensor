@@ -11,4 +11,10 @@ config ROOM_I2C_SCL
     int "SCL GPIO (fixed provisional SuperMini profile)"
     range 5 5
     default 5
+config ROOM_WIFI_HMAC_KEY_ID
+    int "Previously provisioned HMAC key ID (-1 disables Wi-Fi)"
+    range -1 5
+    default -1
+    help
+        Experimental only. Select an approved existing protected key; never creates a key.
 endmenu

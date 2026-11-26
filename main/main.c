@@ -2,6 +2,7 @@
 #include "room_i2c_retry.h"
 #include "room_board.h"
 #include "room_runtime.h"
+#include "room_network.h"
 #include "room_settings_nvs.h"
 #include "driver/i2c_master.h"
 #include "esp_timer.h"
@@ -194,6 +195,7 @@ void app_main(void) {
     command.state=ROOM_COMMAND_UNKNOWN;
     runtime_ready=true;
     portEXIT_CRITICAL(&snapshot_lock);
+    if (!room_network_start(CONFIG_ROOM_WIFI_HMAC_KEY_ID)) ESP_LOGW(TAG,"Network task unavailable");
     sensor_i2c sensor={
         .cfg={.i2c_port=I2C_NUM_0,.sda_io_num=CONFIG_ROOM_I2C_SDA,
             .scl_io_num=CONFIG_ROOM_I2C_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7},
