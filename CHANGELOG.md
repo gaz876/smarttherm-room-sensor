@@ -1,3 +1,9 @@
+# Wi-Fi target CI and provisioning review — 2026-11-26
+
+PR #18 workflow-only merged; run 45735143422 building, not yet verified. Reviewed stock provisioning manager and HMAC provider; documented credential storage/logging and irreversible generation risks. No hardware or network activation.
+
+---
+
 # Experimental station binding — 2026-11-26
 
 Added ESP-IDF station-only adapter candidate and mock tests; six final executions passed. Real target and network task integration pending, no credentials or AP. Existing main.c unchanged.

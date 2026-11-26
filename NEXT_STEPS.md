@@ -1,3 +1,9 @@
+# Wi-Fi target and enrollment gates — 2026-11-26
+
+Inspect run 45735143422 when terminal, verify full log, compiled adapter object, artifact and source blobs. Source 6a986225ed3bf2312ac7adf1524181e72f6c9fc0; later journal-only changes allowed. Do not claim runtime networking from unused adapter. Continue protected enrollment/storage design docs/WIFI_ENROLLMENT.md, implement authorized profile lifecycle and separate task; validate actual GPIO9, DHCP, event barriers, resource usage and loss recovery. Stock wifi_prov_mgr switches to FLASH; don't use as-is. No automatic eFuse writes or plaintext fallback. No repeated unrelated tests.
+
+---
+
 # Wi-Fi binding target build next — 2026-11-26
 
 Audit direct SDK component closure and compile exact candidate on ESP32-C3, verify artifacts. Adapter is uncalled so target link/size does not prove working network task. Then authenticated provisioning/enrollment and secure persistent profile interface, separate task integration, on-device tests for delayed vendor events, DHCP, GPIO9, resource use and driver recovery. No real credentials or AP until protected provisioning is ready. Do not enable irreversible eFuse features without approval. No repeat unrelated tests.

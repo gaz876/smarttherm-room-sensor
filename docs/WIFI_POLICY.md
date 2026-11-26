@@ -1,3 +1,9 @@
+# Enrollment review checkpoint — 2026-11-26
+
+See docs/WIFI_ENROLLMENT.md for pinned SDK findings: stock manager forces FLASH storage and includes partial password debug output; do not use as-is. HMAC key generation is irreversible on real hardware. No actual credentials or AP until protected enrollment/storage verified.
+
+---
+
 # ESP-IDF station binding candidate — 2026-11-26
 
 `main/room_wifi_idf.c` implements a station-only binding, no caller in main.c. The future dedicated owner task provides an authorized profile in RAM (SSID 1–32 nonzero bytes, printable WPA2/3 passphrase 8–63 bytes; 64-digit raw PSK and other auth types not supported). Wi-Fi NVS flag disabled and RAM storage selected; no credential persistence or logging by application. No AP. GPIO9 is active-low input with pull-up after boot; a 3 s gesture is reported to the future provisioning task, not acted upon. New default DHCP interface each attempt; no raw SDK IP/disconnect event accepted as authoritative; online requires live association, interface up and nonzero current IP. Stop, wait default event loop barrier, detach/destroy, deinit, second barrier before reuse. Barriers drain queued events but do not prove actual vendor producer quiescence; bench stress tests and actual concurrent/event sequencing required. Ambiguous partial init/attach/clear fails closed to avoid unsafe cleanup; not a full automatic recovery solution. No actual Wi-Fi task, network service or credentials. Direct pinned SDK source reviewed: wifi_default.c 874b3f1788d251329a9e8778748e1e2593d46171; esp_wifi.h 8c03384f53eb68f77f505a589478cb2ca007d3b2; esp_wifi_default.h d30d512e3588e738026bf7edc0b98ade2b8cd27d; esp_netif.h bb21f418595eb55ca896e4c69b6608f221cd9900. Host test command (from root):
