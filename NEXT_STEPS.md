@@ -1,3 +1,9 @@
+# AP/STA and runtime diagnostics checkpoint — 2026-11-26
+
+Continue from 9a39e7bb984fd7e73694c2ad241169e525dcb583. New isolated APSTA configuration and memory probe tests complete. Next exclusive dual-netif owner and start/stop/drain integration, actual fresh DHCP and AP channel migration, trusted per-device identity and SDK decrypted-buffer disposal, approved bounded transport and phone client. Hardware gates: real protected NVS power-cycle/error recovery and flash confidentiality, runtime internal heap/stack low-water and largest block through handshake/trial/cleanup. No automatic eFuse/OTA/heating or plaintext fallback. MQTT preliminary author code confirms incoming numeric indoor/outdoor callbacks, but exact deployed topic/QoS/retain/staleness must be pinned and broker candidate audited before implementation. No unrelated tests or target build until relevant linked change. Prior validated artifact 15087259482; PR #20 draft not merged.
+
+---
+
 # Security 2 target footprint complete — 2026-11-26
 
 Source db9d8f1666f0b0a40ee20eb7d3ae79abde9a4775, run 45755803953, verified artifact 15087259482. No repeat build of unchanged source. Next: secure identity/bootstrap and decrypted-buffer disposal review, bounded real transport and AP/STA/DHCP cleanup; real phone interoperability, runtime heap/stack peaks, connection and recovery. Account for 159952 bytes remaining in 1 MiB app before MQTT/web/OTA; do not change physical partition table or enable keys automatically. PR #17 and #20 remain draft; no main merge, hardware/OTA/heating or paid/private CI. Static footprint does not establish runtime readiness. Dependency and administrative gates remain.
