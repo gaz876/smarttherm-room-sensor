@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          source_sha=f56fb72459f40b20f2bef2c306bb3f3207dc2eee
+          source_sha=f6eac7b9c6f00ac6429ddae98d5d6122d52731d7
           image=docker.io/espressif/idf@sha256:851f136a2c09cf17c13e952b9975606d7d1050be1480b1fd82c7ea4bce78cfb3
           work="$(mktemp -d)"
           cid=""
@@ -96,6 +96,9 @@ jobs:
                 timeout 15s "/tmp/room_host/$cc-combined" "$scenario"
                 echo "HOST_COMBINED_OK $cc $scenario"
               done
+              "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -g -fno-omit-frame-pointer -fno-pie -no-pie -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Itests/mock_sec2 tests/test_room_sec2_context.c -o "/tmp/room_host/$cc-sec2-context"
+              timeout 15s "/tmp/room_host/$cc-sec2-context"
+              echo "HOST_SEC2_OK $cc identity"
               for t in session events task; do
                 extra=()
                 case "$t" in
