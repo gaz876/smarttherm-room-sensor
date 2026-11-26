@@ -1,3 +1,9 @@
+# Isolated AP/STA follow-up — 2026-11-26
+
+Protected baseline 0043c1e9498f22228db950144c0f6665ec83cf23 (PR #17); separate experiment, no changes to protected branch. Require running DHCP client in addition to matching got-IP, live STA link and current IP. This is not proof of DHCP lease freshness; pretrial SDK event-loop barrier and physical testing still required. Stop pending Security 2 replies at the existing 2 s deadline without releasing sender-owned buffer before drain. Six actual host mock runs (session, events, task × GCC 14.2.0 / Clang 17.0.0, strict C11, ASan/UBSan) exit 0. No startup, live transport, new dependencies, workflow changes, hardware, deployment or target build. Previous target archive 15088994612 corrected SHA256: 0e6f102f495ccfc89b5b722433c0cbcce7e7b61796f4ed20b7c559bfb77a25fc (local verified). Next pretrial event barrier, overflow teardown, exclusive station handoff and queue allocation; identity/credential lifetime gates remain. No activation or merge.
+
+---
+
 # AP/STA task target build verified — 2026-11-26
 
 Run 45760537263 all four steps success, verified artifact 15088994612, CRC, 19+5 hashes, all 41 input paths. App 894896 B (+6272), factory free 153680 B, static DRAM 116622 (+8). Same partition/image/dependency manifests and linked archive set. Uncalled integration APIs retained, no real network, dynamic RAM or hardware proof. PR #20 remains draft.
