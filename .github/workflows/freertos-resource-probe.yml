@@ -1,0 +1,161 @@
+name: ESP32-C3 offline FreeRTOS resource probe
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/freertos-resource-probe.yml']
+permissions: {}
+concurrency:
+  group: freertos-resource-probe-20261127
+  cancel-in-progress: true
+jobs:
+  probe:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/freertos-resource-probe-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Build and execute standalone synthetic workload in QEMU
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$work/input/main"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
+          test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
+          (cd "$work/input"; echo '547f03e04701a92cbb699f7f7d015adc1f5b5ef93cbb94c0dd9b7107e2d84e77  qemu.tar.xz' | sha256sum -c -)
+          cat > "$work/input/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+          project(freertos_resource_probe)
+          EOF
+          cat > "$work/input/main/CMakeLists.txt" <<'EOF'
+          idf_component_register(SRCS "probe.c" INCLUDE_DIRS "." REQUIRES freertos heap esp_timer)
+          target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)
+          EOF
+          cat > "$work/input/main/probe.c" <<'EOF'
+          #include <stdint.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include "sdkconfig.h"
+          #include "freertos/FreeRTOS.h"
+          #include "freertos/task.h"
+          #include "freertos/queue.h"
+          #include "freertos/semphr.h"
+          #include "esp_heap_caps.h"
+          #include "esp_timer.h"
+          #if !CONFIG_IDF_TARGET_ESP32C3
+          #error incorrect target
+          #endif
+          enum { N=128, BYTES=4096, STACK_BYTES=4096 };
+          static uint8_t tx[BYTES], rx[BYTES];
+          static QueueHandle_t requests, responses, finished;
+          static SemaphoreHandle_t gate;
+          typedef struct { unsigned role; UBaseType_t remaining; } report;
+          static void require(int ok) {
+              if (!ok) { puts("RESOURCE_PROBE_FAIL"); fflush(stdout); abort(); }
+          }
+          static void finish(unsigned role) {
+              report r={role,uxTaskGetStackHighWaterMark(NULL)};
+              require(xQueueSend(finished,&r,pdMS_TO_TICKS(2000))==pdTRUE);
+              vTaskDelete(NULL);
+          }
+          static void producer(void *arg) {
+              (void)arg;
+              require(xSemaphoreTake(gate,pdMS_TO_TICKS(2000))==pdTRUE);
+              for(unsigned i=1;i<=N;i++) {
+                  for(unsigned k=0;k<BYTES;k++) tx[k]=(uint8_t)(i+k);
+                  require(xQueueSend(requests,&i,pdMS_TO_TICKS(2000))==pdTRUE);
+                  unsigned reply=0;
+                  require(xQueueReceive(responses,&reply,pdMS_TO_TICKS(2000))==pdTRUE && reply==i);
+              }
+              finish(1);
+          }
+          static void consumer(void *arg) {
+              (void)arg;
+              require(xSemaphoreTake(gate,pdMS_TO_TICKS(2000))==pdTRUE);
+              for(unsigned i=1;i<=N;i++) {
+                  unsigned request=0;
+                  require(xQueueReceive(requests,&request,pdMS_TO_TICKS(2000))==pdTRUE && request==i);
+                  memcpy(rx,tx,BYTES);
+                  for(unsigned k=0;k<BYTES;k++) require(rx[k]==(uint8_t)(i+k));
+                  require(xQueueSend(responses,&request,pdMS_TO_TICKS(2000))==pdTRUE);
+              }
+              finish(2);
+          }
+          void app_main(void) {
+              const uint32_t caps=MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT;
+              require(uxTaskPriorityGet(NULL)<2);
+              size_t before=heap_caps_get_free_size(caps);
+              requests=xQueueCreate(1,sizeof(unsigned));
+              responses=xQueueCreate(1,sizeof(unsigned));
+              finished=xQueueCreate(2,sizeof(report));
+              gate=xSemaphoreCreateCounting(2,0);
+              require(requests && responses && finished && gate);
+              require(xTaskCreate(producer,"producer",STACK_BYTES,NULL,2,NULL)==pdPASS);
+              require(xTaskCreate(consumer,"consumer",STACK_BYTES,NULL,2,NULL)==pdPASS);
+              size_t live=heap_caps_get_free_size(caps);
+              int64_t start=esp_timer_get_time();
+              require(xSemaphoreGive(gate)==pdTRUE);
+              require(xSemaphoreGive(gate)==pdTRUE);
+              UBaseType_t remaining[2]={0,0};
+              for(unsigned i=0;i<2;i++) {
+                  report r={0};
+                  require(xQueueReceive(finished,&r,pdMS_TO_TICKS(10000))==pdTRUE);
+                  require(r.role>=1 && r.role<=2 && remaining[r.role-1]==0 && r.remaining>0);
+                  remaining[r.role-1]=r.remaining;
+              }
+              int64_t elapsed=esp_timer_get_time()-start;
+              require(elapsed>=0);
+              /* Single-core, workers outrank main and self-delete after reporting.
+                 Allow idle task to reclaim task allocations. */
+              vTaskDelay(pdMS_TO_TICKS(100));
+              vQueueDelete(requests); vQueueDelete(responses); vQueueDelete(finished);
+              vSemaphoreDelete(gate);
+              vTaskDelay(pdMS_TO_TICKS(100));
+              require(heap_caps_check_integrity_all(true));
+              size_t after=heap_caps_get_free_size(caps);
+              size_t minimum=heap_caps_get_minimum_free_size(caps);
+              size_t largest=heap_caps_get_largest_free_block(caps);
+              printf("RESOURCE_PROBE exchanges=%u static_buffers=%u requested_stack_each=%u free_before=%zu free_live=%zu free_after=%zu min_free=%zu largest_after=%zu stack_remaining_1=%u stack_remaining_2=%u emulated_us=%lld\n",
+                     (unsigned)N,(unsigned)(sizeof(tx)+sizeof(rx)),(unsigned)STACK_BYTES,before,live,after,minimum,largest,(unsigned)remaining[0],(unsigned)remaining[1],(long long)elapsed);
+              puts("RESOURCE_PROBE_PASS"); fflush(stdout);
+          }
+          EOF
+          sha256sum "$work/input/main/probe.c"
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/qemu-tool /tmp/probe
+            tar --no-same-owner --no-same-permissions -xJf /input/qemu.tar.xz -C /tmp/qemu-tool
+            export PATH="/tmp/qemu-tool/qemu/bin:$PATH"
+            command -v qemu-system-riscv32
+            qemu-system-riscv32 --version
+            cp -R --no-preserve=ownership /input/main /input/CMakeLists.txt /tmp/probe/
+            cd /tmp/probe
+            idf.py set-target esp32c3
+            idf.py build
+            test -s build/freertos_resource_probe.elf
+            idf.py size
+            rc=0
+            timeout --kill-after=5s 45s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
+            tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
+            cat /tmp/qemu-clean.log
+            test "$rc" = 0 || test "$rc" = 124
+            test "$(grep -cx RESOURCE_PROBE_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -c "^RESOURCE_PROBE exchanges=128 " /tmp/qemu-clean.log)" = 1
+            if grep -E "RESOURCE_PROBE_FAIL|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
+            echo QEMU_RESOURCE_RUN_OK
+          '
