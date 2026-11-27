@@ -1,4 +1,5 @@
 #include "room_apsta_session.h"
+#include "room_cleanup_budget.h"
 
 static uint64_t session_clock(void *v) {
     room_apsta_session *s=v; return s->clock(s->ctx);
@@ -62,19 +63,31 @@ bool room_apsta_session_step(room_apsta_session *s,bool events_drained) {
     if (e->state==ENROLL_TRIAL && live) (void)bridge_trial(&s->bridge,now,s->bridge.window,e->generation,true);
     return !s->bridge.stopping;
 }
-bool room_apsta_session_close(room_apsta_session *s,bool sender_drained,room_apsta_barrier barrier,void *ctx) {
-    if (!s || s->locked || !s->bridge.window) return false;
-    uint64_t now=session_clock(s); bridge_stop(&s->bridge); s->lease=0;
-    if (!s->cleanup_deadline) s->cleanup_deadline=now>UINT64_MAX-5000u?UINT64_MAX:now+5000u;
-    if (now>=s->cleanup_deadline) { s->locked=true; return false; }
+static bool cleanup_live(void *v) {
+    room_apsta_session *s=v;
+    if (s->locked || !room_cleanup_check(&s->cleanup_deadline,&s->cleanup_last,session_clock(s),s->cleanup_deadline)) {
+        s->locked=true; return false;
+    }
+    return true;
+}
+bool room_apsta_session_close_until(room_apsta_session *s,bool sender_drained,room_apsta_barrier barrier,void *ctx,uint64_t deadline) {
+    if (!s || s->locked || !s->bridge.window || !s->clock) return false;
+    bridge_stop(&s->bridge); s->lease=0;
+    if (!room_cleanup_check(&s->cleanup_deadline,&s->cleanup_last,session_clock(s),deadline)) { s->locked=true; return false; }
     if (!sender_drained || !barrier) return false;
     uint64_t w=s->bridge.window;
-    if (s->radio.phase!=APSTA_IDLE && !room_apsta_stop(&s->radio,w,true,barrier,ctx)) {
+    if (s->radio.phase!=APSTA_IDLE && !room_apsta_stop_guarded(&s->radio,w,true,barrier,ctx,cleanup_live,s)) {
         if (s->radio.phase==APSTA_LOCKED) s->locked=true;
-        return false;
+        (void)cleanup_live(s); return false;
     }
+    if (!cleanup_live(s)) return false;
     /* Only now may the security adapter acknowledge logical window drain. */
-    bool ok=s->transport.bridge?room_sec2_transport_destroy(&s->transport,true):bridge_drained(&s->bridge,now,w);
-    if (!ok) { s->locked=true; return false; }
-    s->cleanup_deadline=0; return true;
+    bool ok=s->transport.bridge?room_sec2_transport_destroy(&s->transport,true):bridge_drained(&s->bridge,session_clock(s),w);
+    if (!cleanup_live(s) || !ok) { s->locked=true; return false; }
+    s->cleanup_deadline=0; s->cleanup_last=0; return true;
+}
+bool room_apsta_session_close(room_apsta_session *s,bool sender_drained,room_apsta_barrier barrier,void *ctx) {
+    if (!s || s->locked || !s->bridge.window || !s->clock) return false;
+    uint64_t deadline=s->cleanup_deadline?s->cleanup_deadline:room_cleanup_limit(session_clock(s));
+    return room_apsta_session_close_until(s,sender_drained,barrier,ctx,deadline);
 }

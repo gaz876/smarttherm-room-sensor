@@ -25,6 +25,8 @@ bool room_wifi_apsta_link_bind(room_wifi_apsta_provider);
 /* Optional backend attachment before the first owner step. No default
  * backend and no public network endpoint in this candidate. */
 bool room_wifi_apsta_link_attach_io(room_phone_io);
+/* Local timed backend, receives the original owner cleanup deadline. */
+bool room_wifi_apsta_link_attach_io_until(room_phone_io,room_phone_timed_close);
 /* Optional first-boot candidate. Protected store must already be initialized;
  * a missing record is checked independently of the caller. No default call. */
 bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider);
