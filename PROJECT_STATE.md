@@ -1,3 +1,11 @@
+# 2026-11-27 — Actual two-thread completion adapter stress
+
+- On adapter checkpoint d7f8f1a4e3cdc6aa2333622fb0de20c0a23d9195 added tests/browser_worker/test_ack_threads.c only. Two real Linux pthreads, CLOCK_MONOTONIC sampled inside adapter lock; distinct thread-local buffers, 10000 correlated copied request/reply round trips per run. Each owner observes WAIT before worker signals completion, then consumes exactly one matching receipt and rejects repeated polls. Stop and separate drain proof checked. Bounded retry/yield belongs only to test harness, not owner implementation.
+- Actual GCC 14.2.0 and Clang 17.0.0 strict C11, -pthread -fsanitize=address,undefined -fno-sanitize-recover=all -fno-pie -no-pie -g -O1, timeout 20 s: both exit 0, 10000 round trips each. Separate GCC -fsanitize=thread executable linked libtsan.so.2; two invocations exited 0 (second captured 55-byte PASS output, no reported races), not proof of race absence. Exact test blob ffd66dd5f4f178a895baf2f6f49c413329b415ff, SHA256 4ebc2cb3bea51f5422aca2d1ac0436cbf25e01430ade4938a2ed3b900a008840; unchanged adapter blob 47104a703fbae97821b0d163de594dc2a0eb8113 and prior mailbox/worker blobs verified. No real SDK, network, new dependencies, firmware, workflow or protected branch changes.
+- Next: integrate with bounded room_phone_channel mock and verify partial-send/expiry/stop result mapping without treating copied bytes as sent. Actual ESP32-C3 task latency, hardware and browser trust remain open; no live activation. No duplicate historical builds or paid/private CI. Revert isolated test commit if required.
+
+---
+
 # 2026-11-27 — Offline synchronized completion receipt adapter
 
 - Base 805312e2e24e5348da712bd9e304842fa14c0775. PR #29 already closed without merge; run 45920972097 and job 140251360914 independently confirmed success, all three steps and 1017/1017 build steps; full retrieved log 208984 characters. No repeated CI or previous completion regression.
