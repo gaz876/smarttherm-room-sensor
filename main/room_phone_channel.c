@@ -50,8 +50,8 @@ bool room_phone_channel_poll(room_phone_channel *c) {
 bool room_phone_channel_close(room_phone_channel *c) {
     if(!c)return false;
     if(!c->attempted)return !c->task&&!c->reply;
-    if(!owner(c))return false;
-    c->stopping=true;
+    if(!owner(c)||c->timed||c->locked)return false;
+    c->stopping=true;c->legacy_close=true;
     /* Successful close consumes backend ownership for this window. */
     if(!c->backend_drained){
         if(!c->io.close(c->io.ctx))return false;
@@ -63,5 +63,38 @@ bool room_phone_channel_close(room_phone_channel *c) {
     if(c->task->session.transport.pending)(void)room_apsta_task_sent(c->task,false);
     if(c->task->session.transport.pending||c->task->session.transport.dispatching)return false;
     enroll_wipe(c->packet,sizeof(c->packet));
+    *c=(room_phone_channel){0};return true;
+}
+
+static bool timed_live(room_phone_channel *c) {
+    uint64_t now=0;
+    if(c->locked||!c->clock(c->clock_ctx,&now)||now<c->cleanup_last||now>=c->cleanup_deadline){c->locked=true;return false;}
+    c->cleanup_last=now;return true;
+}
+bool room_phone_channel_close_until(room_phone_channel *c,uint64_t deadline,room_phone_clock clock,void *clock_ctx,room_phone_timed_close close) {
+    if(!c)return false;
+    if(!c->attempted)return !c->task&&!c->reply;
+    if(!owner(c)||c->locked)return false;
+    c->stopping=true;
+    if(!c->timed){
+        /* Do not change backend contract after legacy close consumed it. */
+        if(c->legacy_close||c->backend_drained||!clock||!close||!deadline){c->locked=true;return false;}
+        c->timed=true;c->cleanup_deadline=deadline;c->clock=clock;c->clock_ctx=clock_ctx;c->timed_close=close;
+        if(!timed_live(c)||deadline-c->cleanup_last>5000u){c->locked=true;return false;}
+    }else if(c->cleanup_deadline!=deadline||c->clock!=clock||c->clock_ctx!=clock_ctx||c->timed_close!=close){c->locked=true;return false;}
+    if(c->window!=c->task->session.bridge.window){c->locked=true;return false;}
+    if(!timed_live(c))return false;
+    if(!c->backend_drained){
+        bool drained=close(c->io.ctx,c->window,deadline);
+        if(!timed_live(c)||!drained)return false;
+        c->backend_drained=true;
+    }
+    if(c->window!=c->task->session.bridge.window){c->locked=true;return false;}
+    if(c->task->session.transport.dispatching)return false;
+    if(!timed_live(c))return false;
+    if(c->task->session.transport.pending)(void)room_apsta_task_sent(c->task,false);
+    if(!timed_live(c)||c->task->session.transport.pending||c->task->session.transport.dispatching)return false;
+    enroll_wipe(c->packet,sizeof(c->packet));
+    if(!timed_live(c))return false;
     *c=(room_phone_channel){0};return true;
 }

@@ -58,6 +58,22 @@ static bool close_io(void *v) {
     room_sdk_stop_result s=room_sdk_stop_poll(&f->sdk,7,drained);
     return room_drain_step(&f->drain,7,now,s==ROOM_SDK_DRAINED,s==ROOM_SDK_LOCKED,true,drained,drained)==DRAIN_DONE;
 }
+#ifdef ROOM_ADMISSION_TIMED_TEST
+static bool channel_clock(void *v,uint64_t *now) {
+    (void)v;int64_t us=esp_timer_get_time();if(us<0)return false;*now=(uint64_t)us/1000u;return true;
+}
+static bool close_io_timed(void *v,uint64_t window,uint64_t deadline) {
+    fixture *f=v;CHECK(window==7&&deadline==f->outer_deadline);return close_io(v);
+}
+#endif
+static bool close_channel(room_phone_channel *c,fixture *f) {
+#ifdef ROOM_ADMISSION_TIMED_TEST
+    return room_phone_channel_close_until(c,f->outer_deadline,channel_clock,f,close_io_timed);
+#else
+    (void)f;return room_phone_channel_close(c);
+#endif
+}
+
 static void *callback(void *v) {
     fixture *f=v;room_lease callback_lease={0},buffer_lease={0};
     assert(room_admission_enter(&f->gate,7,&callback_lease));assert(room_admission_enter(&f->gate,7,&buffer_lease));
@@ -77,18 +93,21 @@ static void run(bool app_first,bool partial,bool late,bool error) {
     CHECK(room_phone_channel_open(&c,&t,(room_phone_io){&f,open_io,receive_io,send_io,close_io})==!partial);
     CHECK(!pthread_create(&app,NULL,callback,&f));wait_sem(&f.ready);
     atomic_store(&clock_us,700000); /* outer budget began at 100, backend sees 700 */
-    CHECK(!room_phone_channel_close(&c));pthread_mutex_lock(&mu);while(!entered)pthread_cond_wait(&cv,&mu);pthread_mutex_unlock(&mu);
+    CHECK(!close_channel(&c,&f));pthread_mutex_lock(&mu);while(!entered)pthread_cond_wait(&cv,&mu);pthread_mutex_unlock(&mu);
     CHECK(f.requests==1&&f.calls==1&&c.attempted);CHECK(f.drain.deadline==5100&&f.sdk.deadline==5100);
-    room_lease refused={0};CHECK(!room_admission_enter(&f.gate,7,&refused));CHECK(!room_phone_channel_close(&c));CHECK(t.session.transport.pending);
+#ifdef ROOM_ADMISSION_TIMED_TEST
+    CHECK(c.timed&&c.cleanup_deadline==5100);CHECK(!room_phone_channel_close(&c));
+#endif
+    room_lease refused={0};CHECK(!room_admission_enter(&f.gate,7,&refused));CHECK(!close_channel(&c,&f));CHECK(t.session.transport.pending);
     if(!app_first)allow_stop(&f.sdk);
-    allow_app(&f);CHECK(!room_admission_drained(&f.gate,7));CHECK(!room_phone_channel_close(&c));CHECK(t.session.transport.pending);
-    if(app_first){allow_app(&f);CHECK(room_admission_drained(&f.gate,7));CHECK(!room_phone_channel_close(&c));}
-    if(late){atomic_store(&clock_us,5100000);CHECK(!room_phone_channel_close(&c));}
+    allow_app(&f);CHECK(!room_admission_drained(&f.gate,7));CHECK(!close_channel(&c,&f));CHECK(t.session.transport.pending);
+    if(app_first){allow_app(&f);CHECK(room_admission_drained(&f.gate,7));CHECK(!close_channel(&c,&f));}
+    if(late){atomic_store(&clock_us,5100000);CHECK(!close_channel(&c,&f));}
     if(app_first)allow_stop(&f.sdk);else allow_app(&f);
     if(!late)atomic_store(&clock_us,5099000);
     CHECK(room_admission_drained(&f.gate,7));for(unsigned i=0;i<sizeof f.buffer;++i){CHECK(!f.buffer[i]);}
-    CHECK(room_phone_channel_close(&c)==!(late||error));CHECK(f.requests==1&&f.calls==1);CHECK(c.attempted==(late||error));CHECK(t.session.transport.pending==(late||error));
-    CHECK(room_phone_channel_close(&c)==!(late||error));CHECK(f.requests==1&&f.calls==1);
+    CHECK(close_channel(&c,&f)==!(late||error));CHECK(f.requests==1&&f.calls==1);CHECK(c.attempted==(late||error));CHECK(t.session.transport.pending==(late||error));
+    CHECK(close_channel(&c,&f)==!(late||error));CHECK(f.requests==1&&f.calls==1);
     CHECK(!pthread_join(app,NULL));pthread_mutex_lock(&mu);quit=true;pthread_cond_broadcast(&cv);pthread_mutex_unlock(&mu);CHECK(!pthread_join(worker,NULL));
     CHECK(!sem_destroy(&f.ready));CHECK(!sem_destroy(&f.release));CHECK(!sem_destroy(&f.done));
 }
