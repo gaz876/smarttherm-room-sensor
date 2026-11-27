@@ -77,6 +77,9 @@ bool room_apsta_task_packet(room_apsta_task *t,bool hs,const uint8_t *in,size_t 
     *out=NULL;*n=0;
     if (!owned(t) || !room_apsta_events_poll(&t->events,&t->session) ||
         !advance(t,true) || t->pending || !room_apsta_ready(&t->session.radio,t->session.bridge.window)) return false;
+    /* A staged trial must wait for the pretrial marker even when posting
+     * that marker failed and therefore no token is pending yet. */
+    if (!t->session.radio.trial && t->session.bridge.phone.enrollment.state!=ENROLL_IDLE) return false;
     return room_sec2_transport_exchange(&t->session.transport,hs,in,len,out,n);
 }
 bool room_apsta_task_sent(room_apsta_task *t,bool ok) {
