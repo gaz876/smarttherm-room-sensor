@@ -25,7 +25,8 @@ bool room_apsta_session_open(room_apsta_session *, room_setup_clock, void *,
     const uint8_t *, size_t, const uint8_t *, size_t,
     const protocomm_security2_params_t *, uint32_t);
 /* Call after processing pending SDK events in the owner task. Before first
- * trial, caller must prove its event queue is drained; before each packet,
+ * trial, caller must prove its event-loop marker was acknowledged and its
+ * event queue is drained; before each packet,
  * process all queued events. Actual sender owns pending buffer until finish. */
 bool room_apsta_session_step(room_apsta_session *, bool events_drained);
 bool room_apsta_session_close(room_apsta_session *, bool, room_apsta_barrier, void *);

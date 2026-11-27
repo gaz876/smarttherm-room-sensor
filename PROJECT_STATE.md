@@ -1,6 +1,270 @@
+# 2026-11-27 — Offline completion contract integration regression
+
+- Reviewed existing copied mailbox and owner channel contracts: taking a copied reply is not sending it; a second TAKE_REPLY is rejected both before and after successful send completion, so this observation cannot serve as an acknowledgement. The real adapter needs an explicit, correlated completion indication to the owner and must not report successful send on copy alone. Failure or expiry must not produce a successful receipt. External buffer drain and worker exit remain independent proofs.
+- Added standalone tests/browser_worker/test_completion.c, a serialized synthetic sender fixture only, no live transport or firmware integration. Actual local GCC 14.2.0 and Clang 17.0.0 strict C11, ASan/UBSan, -fno-sanitize-recover=all -fno-pie -no-pie, both exit 0 under 10 s timeout, 45 checks each. Exact local baseline blobs mailbox c73f0dd25a66edd063f30d314a40b590acebe859 and worker bbb110d76bffede4942330ce7d59a99eca8af42d matched GitHub. Tested new blob b8049ea6fac862deffe2466e71b7f5765d377594, SHA256 b95954e891d5d3075cb88236fa98a90ecf7bda772424ac982880973c2fe11b04. Covers early, repeated, mismatched, failed and late completion, stop and drain. Synthetic receipt is not a synchronized production implementation or proof of actual send.
+- Next: design explicit owner/worker completion result and lifetime contract, then integrate a bounded mock adapter and test scheduling; real worker shutdown, physical target timing and browser trust remain open. No network, firmware, dependencies, workflow, device or OTA changes. Revert isolated test commit if needed.
+
+---
+
+# 2026-11-27 — ESP32-C3 clock/synchronization compile-link PASS
+
+- PR #29, head ccf4f2ec264f7467ded1b5b44332f008fafc4b9b, workflow fc838f094208be373969811b0d7a779447ab1d72, run 45920972097 / job 140251360914: success, all three steps. Full log reviewed: 1017/1017, real ELF and binary, CLOCK_SYNC_COMPILE_LINK_OK; SDK 6.1.1, GCC 15.2.0, exact pinned mailbox and worker headers verified by successful workflow hash checks. ELF elf32-littleriscv includes room_sync_probe, room_sync_init, room_sync_clock, room_sync_atomic_capability and esp_timer_get_time. Probe binary 0x25360 bytes; standalone default layout, NOT the candidate partition or firmware size.
+- Disassembly of room_sync_atomic_capability returns 1 (sometimes lock-free), not 2; no guarantee of lock-free operation or bounded scheduling on the device. SDK Kconfig deprecation/choice notices present; no compiler warning/error markers found in reviewed log. Token Metadata: read, zero artifacts. No actual probe execution, Wi-Fi, flash, OTA or protected-branch merge. Administrative security visibility remains limited.
+- Compile/link gate satisfied for the isolated model only. Close PR #29 without merge, preserve source and run. Next: offline copied-buffer send completion contract and mock integration tests; actual ESP32-C3 task scheduling, timer latency, TLS trust and resource quiescence remain unverified. Do not activate networking or alter production configuration. Prior pending entry below is historical.
+
+---
+
+# 2026-11-27 — ESP32-C3 clock and synchronization compatibility probe
+
+- Source review: ESP-IDF 6.1.1 commit 051e4c4eb20346e043cdd47bc388fde75ff8af63, esp_timer.h blob e48a213634d3e2cd6ba1dec657687a756d48c291, stdatomic.c 428a800eca518e00b17ead979b2c7acef5aa9633, esp_stdatomic.h a988075a6ffd3022b6be10e5c0d038467ec2b41c. SDK provides software atomic operations on single-core targets without native A extension using interrupt masking. esp_timer_get_time returns signed 64-bit microseconds; documented fast nonlocking reads, deep-sleep resets clock; discard session across restart. https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/system/esp_timer.html
+- Local generic Clang 17 RV32IMC freestanding assembly-only probe exit 0, two atomic-alignment warnings, emitted __atomic_compare_exchange_1 and __atomic_store_1 calls, ATOMIC_BOOL_LOCK_FREE macro 1; not Espressif GCC, not linked or run. Local SDK/compiler/container runtime absent. No lock-free or target latency claim. Keep task-only ownership; no spin retry at elevated priority.
+- Isolated draft PR #29, ci/clock-sync-probe-20261127, commit ccf4f2ec264f7467ded1b5b44332f008fafc4b9b, workflow blob fc838f094208be373969811b0d7a779447ab1d72; run 45920972097 in_progress at capture, no result yet. Exact two public headers pinned by SHA, standalone empty app_main, offline capability-dropped image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c, GCC 15.2.0, permissions {}, standard public runner, 12 min limit. Only workflow added on separate branch, no merge, no secrets referenced, no artifact upload or device writes. Administrative secret/settings visibility still limited; no claim full audit.
+- Next: inspect run status, all jobs, full logs and linked symbols before accepting compile/link compatibility; then test actual task scheduling/latency, synchronization and timer on hardware separately. No firmware change, real SDK worker or hardware activation. Do not duplicate run. Close test PR without merge after result review.
+
+---
+
+# 2026-11-27 — Offline mailbox clock ordering and race-detector test
+
+- Host-only mailbox now samples one trusted monotonic clock AFTER acquiring the atomic try-lock; event-supplied time is ignored in the clocked entry. Busy does not sample clock. Clock failure stops/faults the model and wipes its slot; backwards time still faults. Legacy explicit-time entry retained for offline regression. Shared real-time callers must use the same bounded non-reentrant clock; this remains a caller contract, not a live adapter.
+- Actual local Linux GCC 14.2.0 and Clang 17.0.0 strict C11 -Wall -Wextra -Werror -pedantic -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -pthread: both old test_mailbox (35 checks + 10000 fixed-clock round trips) and new test_clock (20 checks + 10000 CLOCK_MONOTONIC two-thread round trips) exit 0 under 20 s timeout. GCC separate -fsanitize=thread run of test_clock exit 0, 20 checks + 10000 real-clock round trips, no reported races. This is not proof of absence of races. Host atomic_bool lock-free test passed. New tested blobs mailbox c73f0dd25a66edd063f30d314a40b590acebe859, test 80b666ce1eee51a944c54be7de4e4707d15048fe. SHA256 a992d1122351ff31ec7114cff33f3192b38bb81972f2b990195a7a1a6da533b2 and b7196eca06536855871bd163cf28f8b995aab640e449fdb891c4e26c3a2b31df. Baseline worker and test_mailbox unchanged, local baseline blobs matched GitHub.
+- Espressif stable ESP32-C3 timer documentation (https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/system/esp_timer.html) supports considering esp_timer_get_time for the target clock; exact target atomic implementation and timing, real SDK worker exit/drain and target build not yet verified. No live networking, dependencies, firmware, production configuration, CI, flash, OTA or protected merge. Next: isolated target compile probe for synchronization and timer, and mock room_phone_io adapter with actual send acknowledgement; retain trust/Security2/hardware gates. Revert this isolated change if required.
+
+---
+
+# 2026-11-27 — Offline copied mailbox and threaded stress test
+
+- Added tests/browser_worker/mailbox.h and test_mailbox.c, host-only and not linked into firmware. Single 4096-byte copied slot, C11 atomic try-lock, explicit busy/reject/success, one in-flight exchange, window/ticket checks, copy before send acknowledgement, volatile clearing of internal slot on consumption/stop. No borrowed pointers, network, credentials, SDK calls or external dependencies. Existing worker_model.h unchanged (bbb110d76bffede4942330ce7d59a99eca8af42d).
+- Actual isolated Linux GCC 14.2.0 and Clang 17.0.0 strict C11 -Wall -Wextra -Werror -pedantic -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -pthread; both exit 0 under 20 s timeout, each 35 checks + 10000 two-thread round trips PASS. Tested Git blobs mailbox 90222d5334a5beb50ab058f2b767f7e5c70f1e69, test 7c02e0cdf462c5b8084c9b896e779c246912ec99; SHA256 b2857dbe8ffc93ce1d7c5c8d6c0f908bb9c368ccc63debb09c1264c25d768e60 and b60fa8f4d54b25f72f3561d4f2b767a8652431c232d203c8de386ca947593421. Reproduce from tests/browser_worker with the same flags and test_mailbox.c. Synthetic packets only.
+- Limitations: ASan/UBSan not a race detector; stress uses fixed timestamp, timeout tests serialized. Real-time ordering across tasks, lock-free atomic implementation on ESP32-C3, external buffer lifetime/clearing and actual SDK worker exit/drain not verified. Current model requires trusted ordered timestamps and disjoint private caller buffers. No blocking SDK stop in owner. Next: resolve clock ordering and target synchronization, then room_phone_io mock adapter and send-completion semantics, integrated tests and target build. TLS trust/Security2, hardware isolation/DHCP/storage and physical rollback remain open. No firmware, workflow, protected branch, flash or OTA changes. Revert isolated commit to remove model.
+
+---
+
+# 2026-11-27 — Offline server worker lifecycle model
+
+- Standalone C11 model and tests under tests/browser_worker, not linked or activated in firmware. Serialized trusted local events only; no sockets, HTTP parser, TLS, credential handling, actual buffer copying, synchronization or SDK calls. Model enforces one in-flight request, 1..4096-byte lengths, window/ticket matching, 2 s start/exchange deadline without extension on reply, 2 s stop acknowledgement budget after observed stop request, and no reuse before actual worker exit AND callback/buffer drain. Timeout during stop permanently locks model for this boot. It does not make a blocking SDK function bounded or establish real resource quiescence. Actual owner must poll and serialize events; Wi-Fi teardown/handoff blocked until proved safe.
+- Official ESP-IDF HTTP server docs confirm blocking stop and interface binding: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/protocols/esp_http_server.html ; HTTPS SDK audit retained. No blocking SDK stop in Wi-Fi owner.
+- Actual isolated Linux tests GCC 14.2.0 and Clang 17.0.0, strict C11 -Wall -Wextra -Werror -pedantic ASan/UBSan nonrecovering, each exit 0 under 10 s timeout; 62 assertions each. Tested files Git blobs bbb110d76bffede4942330ce7d59a99eca8af42d and 7efa79326235be59c061979b16d9713b6e03dd77. Re-run from tests/browser_worker: gcc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=undefined,address -fno-sanitize-recover=all -g -O1 test_worker_model.c -o /tmp/worker-test && timeout 10 /tmp/worker-test (or clang).
+- No actual worker, copied mailbox or threading yet; next design bounded copied mailbox with ownership and synchronization, integrate with room_phone_io and SDK worker mock, verify late completion and shutdown, then target build against committed partition. Browser certificate trust/Security2, DHCP, TLS heap, SDK shutdown and hardware remain release blockers. No dependencies, production config, CI, flash, OTA or protected merge. Revert this isolated commit if needed.
+
+---
+
+# 2026-11-27 — Independent Node test of published browser model
+
+- Source commit 68f2d938aeab117ba5ce0fa59df648069557518b. Direct raw GitHub download failed (sandbox DNS); fetched exact files through GitHub connector, reconstructed local copies and verified git hash-object against both published blobs: model af0d7cfae55ca939b320f0d96774dac8a6508440, test 162464cf43c78b72afd4d5d374566c6e056a6afa. SHA256 model 388502b5ef3bcda41509b22faeffa096ecebc06fdc1340d46a05de67d911403d, test c78f015239bbebf65d567e7075214797e5721202509c18f47fdb9e5f0f0589b4.
+- Local Node.js v22.16.0: node --check on both modules exit 0; node test_view_model.mjs exit 0, 114 assertions PASS. Prior direct V8 run also 114 assertions PASS. No external packages, network requests, credential collection, CI, or firmware changes. Actual mobile browser, HTTPS and SDK end-to-end interoperability not tested.
+- Next: isolated bounded server worker contract and browser trust/Security2 interoperability review, then integrated tests and target build with committed partition; preserve fail-closed behavior and no live credential entry or device writes before hardware gates.
+
+---
+
+# 2026-11-27 — Offline browser presentation state model
+
+- Added isolated ES module and tests under tests/browser_setup (not included in firmware or served by preview). No network, DOM, credential collection, cryptography, dependencies, storage, workflows, or startup changes. Based on exact src/room_setup_dispatch.h and room_setup_request.h contracts and existing docs/BROWSER_SETUP.md. The view is NOT an authentication or authorization implementation.
+- Actual V8 execution before publication: 114 assertions PASS, including full reply code/phase/token-presence matrix, exact 64-bit token handling, one outstanding request, matching local reply ticket, matching trial, explicit save confirmation, fresh verified status, terminal receipts, ambiguous/lost/late save without retry, cancellation, expiry and monotonic time. Test source generated from the same executed function definitions. Browser/Node and SDK interoperability not yet run.
+- Independent trust anchor, actual Security 2 browser client, AP-only SDK worker with bounded shutdown, real DHCP freshness and protected storage, runtime heap, hardware and target compilation remain open. No actual password entry or live endpoint. No flash/OTA/protected merge. Next: run standalone Node tests on published files, then review secure browser client and implement isolated bounded backend worker model; do not enable real input or listener until all trust and lifecycle gates pass. Revert this commit to remove isolated model if needed.
+
+---
+
+# 2026-11-27 — Approved 2 MiB layout adopted in experimental candidate
+
+- User approved candidate adoption only. Base cd786d0de71d3824c8d84ea1fedda42d925d6a56 differs from the previously tested source 75df361f733973bd7d58e7bd856af96da28bdbb6 only in three journals (GitHub compare). Apply exact CSV transformation from successful PR #28 / run 45912021281: move factory to 0x120000 / 2 MiB, sort after room_wifi; no CMake, sdkconfig, runtime or workflow edits. Local arithmetic/structural checks passed: row order, all data entries identical, app alignment and size, nonoverlap and 4 MiB bounds, original factory range excluded.
+- Prior SDK-generated table and inert HTTPS build evidence retained; no fresh target compilation for this committed candidate yet. Prior experiment applied temporary HTTPS linkage that is NOT adopted here. No duplicate run for the identical CSV alone; next target build must verify actual candidate table hash b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246 and generated application offset. No device writes, OTA, protected merge or production release. Roll back source change by reviewed revert; hardware recovery not proven. Next: trusted browser interface design and validation, then isolated target build with actual candidate. Existing DHCP freshness, bounded shutdown, certificate trust, Security2 interoperability and physical flash/heap gates remain.
+
+---
+
+# 2026-11-27 — Offline 2 MiB partition experiment PASS
+
+- PR #28 head 3c6b04341752471b3d27a5468264d8e3ff5957e9, workflow blob 9535132ee46b53d95af3487f37a2341ea0cab4f9, run 45912021281 / job 140222386233 completed success, all three steps. Full log 240058 characters / 1842 lines; actual 1029/1029 build, BUILD_EXIT=0; SDK 6.1.1, GCC 15.2.0, source 75df361f733973bd7d58e7bd856af96da28bdbb6. Log lists 48 source blobs; four critical build/config inputs independently matched; full per-blob recheck hit connector call limit. Zero warning/error markers or common credential signatures detected in log; not full security clearance. Token Metadata read only; no artifacts.
+- CSV_ORDER_OK, DATA_PARTITIONS_UNCHANGED, PARTITION_GENERATOR_OK, APP_OFFSET_OK=0x120000, GENERATED_TABLE_MATCH_OK, HTTPS_PARTITION_2M_BUILD_OK, PARTITION_EXPERIMENT_OK. Generated table SHA256 b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246 equals independently generated table; old table ea697e36954d8d3fe4b112e9693ab32764e90bf81507434711b83eff4f19c20f. All eight forced HTTPS symbols and Security2 checked by workflow. App 1053392 bytes (+119168); headroom 1043760 of 2097152; static DRAM 112930/321296, remaining static 208366, not runtime heap.
+- Offline layout qualifies for continued design only. No actual partition/config changes, runtime listener, device flash, OTA, deployment or main merge; physical 4 MiB capacity, power-loss/rollback and TLS runtime heap remain unverified. Do not rerun this experiment without new reason. Preserve old partition and app; next: separately approved candidate partition adoption if needed, trusted browser backend design (certificate trust, exclusive AP/STA ownership, bounded shutdown, DHCP freshness and Security2 interoperability), then mock and target tests; no hardware activation. Existing protected branch and 5.5.6 baseline retained.
+
+---
+
+# 2026-11-27 — Partition CSV ordering correction
+
+- PR #28 initial run 45910641021, job 140217880963, workflow b66009136bb4481e69438fa11179eda85e996b41 failed before compilation: SDK CSV generator reported line 6 overlap because relocated factory row preceded the lower-offset room_wifi row. Addresses themselves do not intersect. No firmware was compiled or flashed by that attempt.
+- Corrected only experimental workflow in commit 3c6b04341752471b3d27a5468264d8e3ff5957e9: remove original factory row, append relocated factory after room_wifi, assert exact order, offsets and 2M size before SDK validation. No security check removed. All original data offsets and proposed factory range unchanged.
+- Replacement run 45912021281 status at capture in_progress, conclusion pending. Do not duplicate. Review final generator/roundtrip/flash manifest and build results before accepting layout. No candidate code/config change, main merge, firmware upload, hardware operation or OTA. Physical Flash and rollback remain untested.
+
+---
+
+# 2026-11-27 — Approved offline 2 MiB partition validation
+
+- User explicitly approved experiment only: relocated 2 MiB factory at 0x120000, preserve NVS/PHY/room_wifi offsets, no device writes or OTA. Draft PR #28, ci/partition-2m-20261127, workflow b66009136bb4481e69438fa11179eda85e996b41; run 45910641021, status in_progress, conclusion pending. Do not duplicate. Inspect actual SDK generation, build, symbols, size, flash manifest and all checks before claiming PASS.
+- Pinned public source 75df361f733973bd7d58e7bd856af96da28bdbb6; firmware inputs identical to HTTPS footprint experiment. Temporary container CSV and CMake changes only, not applied to candidate or main. Same qualified SDK/image/GCC, offline container and minimal token. SDK generator validates 4 MiB old/new tables and binary roundtrip, data partition equality, built partition binary equality and expected app offset in generated flash manifest. Inert HTTPS linked, normal size checks retained, no binary upload/flash.
+- Candidate app range 0x120000..0x31ffff, old factory area untouched in design. Expected free app space about 1043760 bytes, to be measured. Hardware flash capacity, boot and rollback behavior remain unverified. No production layout or OTA authorization. After result, review logs and decide whether to incorporate validated experimental layout into a separate source branch.
+
+---
+
+# 2026-11-27 — HTTPS footprint measured; partition does not fit
+
+- PR #27 workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8, run 45906704171, job 140205056464 succeeded as a measurement, NOT a deployable build. Actual SDK build exit 2, explicit factory overflow 0x12d0, HTTPS_PARTITION_OVERFLOW_CONFIRMED and HTTPS_FOOTPRINT_MEASURED. No warning lines, token Metadata: read, zero uploaded artifacts. Pinned source 1d005d634705baa187af55fb21f7b548c642da93; no runtime HTTPS calls, partition change or flash.
+- Linked HTTPS dependency measurement: bin 1053392 bytes vs baseline 934224 (+119168), current 1048576-byte factory partition exceeded by 4816. Static DRAM 112930 vs 112812 (+118); remaining static budget 208366, not runtime heap. Flash code 817006; total image size 1053024 unpadded. Actual TLS connections, certificates, browser UI, MQTT and runtime heap are not measured.
+- Proposed design for review only: 2 MiB single factory app at 0x120000..0x31ffff, retain nvs 0x9000..0xefff, phy_init 0xf000..0xffff and room_wifi 0x110000..0x115fff unchanged; original factory region 0x10000..0x10ffff remains unused and intact if migration writes only new app/table, enabling a potential rollback to old table. 896 KiB free after new app. New app headroom against inert measurement 1043760 bytes. App offset 64 KiB aligned, all ranges inside declared 4 MiB. This is arithmetic/design review, not SDK-generated or hardware-verified layout. Do not modify actual partition table before explicit approval, physical flash verification, backup and recovery assessment; migration/rollback not proven, no OTA introduced. Reference: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-guides/partition-tables.html
+- Alternative: reduce footprint without weakening TLS/security, but current 1 MiB already exhausted before browser UI and MQTT. Recommend offline validation of proposed layout after approval; preserve previous known-good firmware and data, no device writes. Close standalone PR #27 without merge.
+
+---
+
+# 2026-11-27 — Inert HTTPS footprint experiment
+
+- Draft PR #27, ci/https-footprint-20261127, workflow c9fa2bad511cae2de85e1b8a67655f7b80510cc8; run 45906704171 status at capture in_progress, conclusion pending. Do not duplicate; inspect final logs, linker symbols, size and build exit before reporting measurement.
+- Pinned source 1d005d634705baa187af55fb21f7b548c642da93, all firmware input blob SHAs match qualified 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2. SDK 6.1.1 / GCC 15.2.0, same pinned public image. Temporary CMake copy only: force inclusion of HTTPS start/stop and representative request/response functions; no runtime calls, credentials, listener, OTA, partition edits or firmware upload. Offline capability-dropped container, read-only source, permissions {}.
+- Current declared flash 4 MiB; factory offset 0x10000 size 1 MiB; room_wifi NVS offset 0x110000 size 0x6000. Baseline 934224 bytes and 114352 free. If measured binary exceeds partition, record explicit SDK partition error and negative headroom; do not bypass partition validation. Probe is dependency footprint, not complete browser backend or runtime TLS heap. No actual hardware flash capacity verified. Preserve prior build and protected branch. Any partition redesign requires separate approval and migration/rollback assessment.
+
+---
+
+# 2026-11-27 — ESP-IDF 6.1.1 qualification PASS
+
+- PR #26 workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973, job 140197424290 completed success. Exact source 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2, SDK 051e4c4eb20346e043cdd47bc388fde75ff8af63, image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c, RISC-V GCC 15.2.0. HTTPS_SDK_PROBE_OK, ESP32C3_BUILD_OK, all 51 GCC ASan/UBSan mock scenarios passed; Clang unavailable; no warning lines in job log. Token Metadata: read.
+- Firmware bin 934224 bytes, 114352 bytes free in 1 MiB app partition (10.9%); +32240 bytes over 5.5.6 baseline 901984. Static DRAM 112812 vs 122030 bytes (-9218); remaining static budget 208484 vs 199266, not measured runtime heap. Compile-only HTTPS probe bin 150016 bytes; does not establish actual HTTPS server footprint or runtime behavior.
+- Artifact 15157661167, 5036778 bytes, independently downloaded: ZIP SHA-256 1d1f9f7e9abb961ea5ef918c35a377732a660cf28567e0321c799a9df3fa5153 matches GitHub. All 21 entries CRC-valid; 20 SHA256SUMS and 5 binary checksums match; provenance and 51 PASS markers verified; no common credential signature hits in archive. Security2 only, HMAC key ID -1, no automatic security provisioning config. Retention 14 days. No flash/OTA.
+- SDK 6.1.1 qualifies for subsequent isolated development, not production activation. Preserve 5.5.6 baseline. Close single-purpose PR #26 without merge; next stage: quantify actual HTTPS component footprint with an inert link probe and assess partition/RAM headroom, then design trusted local browser backend and tests. Real AP-only isolation, bounded worker shutdown, certificate provisioning, Security2 browser interoperability, hardware DHCP/NVS, MQTT remain unverified. No partition change, production configuration change or protected merge authorized by this qualification.
+
+---
+
+# 2026-11-27 — ESP-IDF 6.1.1 qualification in progress
+
+- Draft PR #26, ci/idf611-qualification-20261127, workflow d6c19f1fc4593af5ad4964a250c7f7b9338bd17f, run 45904358973 in progress at capture. Do not duplicate. Read final job logs and independently verify artifact before claiming success.
+- Source 2eb6ddfb4d281af79fe13a794a6f668cb6d97bf2, only four tests/https_sdk_probe files differ from compiled input 4616624dd00abe44f0b2dabce2b44b657c85383d; firmware unchanged. SDK 051e4c4eb20346e043cdd47bc388fde75ff8af63, recommended GCC 15.2.0, image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c.
+- Offline capability-dropped container, read-only public inputs, minimal token, no secrets/OTA/activation. Compile HTTPS probe and firmware, check config and symbols, run 51 host cases, record sizes and checksums. Baseline 5.5.6 and protected branch preserved. Hardware/browser tests pending.
+
+---
+
+# 2026-11-27 — Public Git history audit completed
+
+- User supplied repository Actions settings screenshot: full SHA pin required, all external contributors require approval, default token read-only, Actions PR creation/approval disabled, all Actions allowed. User reports Actions secrets/variables and environments empty. Screenshot repository identity relies on user context; organization-wide settings not independently accessible. Retain full SHA requirement; no settings changed.
+- Standalone draft PR #25, commit 25df1d21451966819e80289ea6344feddbcb1b13, run 45903480435, job 140194581236: Gitleaks 8.30.1 official archive SHA-256 verified, full mirror non-shallow, git fsck passed, 60 advertised refs, 280 reachable commits, refs inventory SHA-256 12b69a5865887ed34adbfc504605b7e7007487c319f1306857161ec8350dd64c; scanner exit 0, findings 0, HISTORY_SCAN_OK. Job token Metadata: read. No report published. Scope is reachable public history at scan time; not deleted/unadvertised refs, every possible secret format, or private repos. Candidate scanned at 3c73e6795f8839997256c5914632a6a60b20820c; protected 0043c1e9498f22228db950144c0f6665ec83cf23.
+- Next: qualify agreed ESP-IDF 6.1.1 in separate single-purpose isolated CI; retain prior firmware source 4616624dd00abe44f0b2dabce2b44b657c85383d and SDK 5.5.6 baseline. Only public synthetic tests, no secrets, deployment, activation or protected merge. Verify pinned image and SDK source, actual probe compilation, target and host tests, memory footprint. Hardware/browser testing and administrative visibility limitations remain.
+
+---
+
+# 2026-11-27 — Reconciliation after experimental development audit
+
+- PR #23 source checkpoint b9f7483691d96a36a6ffbe77ce5c7d713b6600bd; firmware source 4616624dd00abe44f0b2dabce2b44b657c85383d. Protected PR #17 remains 0043c1e9498f22228db950144c0f6665ec83cf23. PR #20 CI checkpoint 50256e555a09faba60d5524d523779ab006bfe99 closed without merge; all history retained. No firmware change.
+- Read-only audit reviewed patches of all 14 source and 15 CI commits for common credential signatures and private project references; no hits. This is not a complete full-history secret scan. Latest jobs had Metadata: read only; repository/organization/environment secret settings not accessible, so publication audit is incomplete.
+- Run 45787225969, job 139796962990, SDK 5.5.6: 51 GCC ASan/UBSan scenarios, target build and artifact checks passed; Clang unavailable. Binary 901984 bytes, 146592 bytes free in 1 MiB app partition. Artifact 15101191273 independently downloaded and checked locally: ZIP SHA-256 b8483d1b4928720355e94bf0bc1185814d4ee817f18bd2153950956ea87bb972 matches GitHub; all 20 entries CRC-valid; 19 SHA256SUMS entries and 5 binary checksums match; provenance source 4616624d; 51 PASS markers, no compiler warning lines, no common credential-pattern hits in archive. No real hardware or browser test.
+- Run 45787226079, job 139796963520: metadata only, AMD64 manifest sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c; raw index SHA-256 2b4f966c37eaedc19542b0637a5f850b2eff9478d8e858192aa0073d92c2dc91. ESP-IDF 6.1.1 source 051e4c4eb20346e043cdd47bc388fde75ff8af63. Migration agreed, but image not executed and new SDK/probe not compiled. Earlier pending-digest statements superseded.
+- Cumulative PR path filters caused a redundant baseline build when metadata workflow was added (157 seconds run elapsed). Historical PR #20 closed without deleting branch or altering workflows. Future registry-only and SDK-qualification work must use separate single-purpose branches/PRs from main with branch guards and paths; no repeated baseline run on documentation or registry-only change. No migration build until outstanding publication audit gates are resolved or explicitly scoped to safe isolated testing.
+- Before further code publication: complete available secret/history/permissions checks, verify source manifest and external dependencies, keep protected branch untouched; actual SDK migration, RAM/stack, AP-only HTTPS, browser trust and Security2, DHCP/NVS hardware, MQTT remain open. No production activation or OTA.
+
+---
+
+# 2026-11-26 — Exact SDK HTTPS isolation audit
+
+- Verified pinned ESP-IDF commit 880a203ae603d08a94d06aa01e0d6761958e5e9e reports v5.5.6. Its HTTP server binds wildcard address and lacks the interface-name configuration field. HTTPS uses the same HTTP server; stop waits for the server thread without an overall bounded deadline. SDK copies private key buffer and directly frees that particular copy; application wiping alone cannot certify full SDK key erasure.
+- Verified official v6.1.1 tag resolves to 051e4c4eb20346e043cdd47bc388fde75ff8af63. Header and implementation expose interface-specific bind with failure returned, and HTTPS default configuration includes it. Stop remains blocking. Prefer isolated migration qualification over custom HTTP parsing or wildcard listener. Exact v6.1.1 Docker digest not verified; no toolchain change, new CI run or network activation. Added standalone compile-only HTTPS API probe (not yet built) and source evidence in docs/HTTPS_SDK_AUDIT.md. No real keys, eFuse, protected-branch merge or deployment.
+
+---
+
+# 2026-11-26 — Browser trust gate and inert Russian preview
+
+- Verified run 45784779902: 51 GCC ASan/UBSan scenarios and target build for 4616624dd00abe44f0b2dabce2b44b657c85383d; artifact 15099603667; CI digest f8b62b8d3900284c5600f23adebdd965fb0517679c23a04acb7199ea33416beb (independent archive verification pending). Clang absent.
+- Added docs/BROWSER_SETUP.md and docs/setup-preview.html. Ordinary private-IP HTTP is not a trusted browser origin for Web Crypto; choose authenticated HTTPS as proposed design pending actual phone trust setup and identity provisioning review. No plaintext credential path. Preview is disabled, no JS/network/form submission, no firmware embedding. Checked static markup for absence of active or external resources; not rendered on phone.
+- Documentation/UI-only commit, no firmware source or CI changes; no new firmware build necessary to validate documentation. Existing successful build belongs to earlier firmware commit. Remaining: review exact SDK HTTPS APIs, actual trust provisioning and browser Security2 interoperability, implement bounded AP-only backend and test hardware. No activation, eFuse, deployment, protected merge or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Optional bounded phone channel candidate
+
+- Added owner-polled packet/reply transport boundary: fixed 4096-byte input, one in-flight reply, nonblocking backend contract, explicit partial send accounting, event/deadline checks, buffer wipe, and backend drain before releasing pending response or tearing down radio. Optional local attachment to existing APSTA link. Backend is not implemented yet; no listening socket, HTTP parser, client or startup caller. Backend must later prove AP-only bind and single peer, no retained buffer pointers, bounded execution and confirmed drain. The standard Espressif SoftAP/HTTP Security2 transport is a reference, not verified compatible with this project's custom commands. See https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/provisioning/protocomm.html .
+- Four additional combined cases: normal partial sends, ambiguous backend open, invalid send count, pending reply held until backend confirms drain. New code not compiled or executed. Prior d8aa27b2422c9338b1de5b43b3d7e368d00fc0e4 passed 47 GCC ASan/UBSan scenarios and target build in 45783784792; artifact 15099333083, CI digest 00fbd941bc0638b1b410efd273db6ad54885130f04e47cf7b81f9dd521db35c1. Clang absent. Added static RAM and CPU cost require measurement on target.
+- No live server, actual credential provisioning, eFuse changes, startup activation, deployment, protected merge or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Read-only protected identity provider candidate
+
+- New versioned setup identity record in separate namespace setup_id within existing explicitly initialized protected room_wifi NVS partition. Read-only application API; no provisioning/write/generation function, no default identity. Strict size/length/padding and nonzero salt/verifier checks are syntax checks only, not evidence of strong or unique per-device credentials. Provider initializes once on a local owner task, validates and wipes probe, rereads only at window prepare, wipes temporary record, assigns local nonzero monotonically increasing SDK session IDs, disables setup after read failure. No startup caller or real phone transport.
+- Synthetic host fixture exercises real store/provider, including absent, truncated, invalid version, noncanonical padding, zero salt/verifier, read error, invalid lengths, owner mismatch, repeated prepare and revocation. Candidate not built/tested. Prior f6eac7b9c6f00ac6429ddae98d5d6122d52731d7 passed 28 GCC ASan/UBSan scenarios and target build in 45782880254; artifact 15099481482, CI digest 1f6ebcbd7d0918171517969ca348819955393a40badf91a199d3f45bdfc66e60. Clang absent.
+- Espressif documentation: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/storage/nvs_encryption.html . HMAC-based encrypted NVS is confidentiality protection, not independent authenticated storage or proof of verified boot; real individual identity provisioning and physical trust model require explicit review. No keys, eFuse operations, startup changes, deployment, protected merge or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Owned Security2 identity lifecycle candidate
+
+- Security2 context owns salt (8–64 bytes) and verifier (384 bytes), including persistent SDK descriptor. Never move live context. Wipe on confirmed SDK deletion, retain on ambiguous session open/close. Provider fills inline bytes; temporary window wiped even on prepare failure. No actual identity provider, generation or listener.
+- Context tests verify copy independent of original buffers, wipe on creation rejection and successful destroy, and retention on ambiguous failure; combined tests check owned identity and wipe. Candidate not yet built/tested. Prior f56fb72459f40b20f2bef2c306bb3f3207dc2eee passed 27 GCC ASan/UBSan scenarios and target build in 45781923320; artifact 15099405187, CI digest cf35a61e410ad4b6733f647211cdb2cf9cb5a12c2cacf5cd96a8816fe18a9f3d. Clang absent; independent archive verification pending.
+- Espressif protocomm docs specify salt and verifier pointer fields; exact pinned SDK source and decrypted-buffer lifecycle still require review. Added memory must be measured on hardware. No startup activation, eFuse writes, protected merge, or deployment.
+
+---
+
+# 2026-11-26 — Verified-save handoff candidate
+
+- APSTA phone policy retains a per-boot committed generation only after authenticated enrollment returns ENROLL_SAVED (write and matching readback). Link snapshots the prior receipt before opening a window. On complete transport/radio teardown only, it reports new verified commit, no save, or uncertain storage. The owner promotes missing profile to valid only for a verified commit, reloads protected storage before STA, and quarantines an uncertain write/readback or invalid reload. Loss of the final response cannot undo verified persistence. No new packet or listener API in production.
+- Test-only fixture includes the actual private link translation unit; five new combined scenarios exercise successful first save, lost final response while borrowed buffer remains pending, write failure, readback failure, and reload failure. The cryptographic SDK, radio, and protected store are mocks. New candidate not built/tested yet. Prior 46aeda41abdf79817156efe4ed8ed2cbad383176 passed 22 GCC ASan/UBSan scenarios and target build in 45781113824, artifact 15098671233, CI digest 2978a5539e5d417edd73d20df911ef37e54ad5efce82fc0b22d7cb3b9a7695c4. Clang absent, independent archive verification pending.
+- Remaining: identity/provider lifetime, real phone transport and sender drain, SDK decrypted-buffer review, startup integration and physical testing. No activation, eFuse changes, deployment, protected-branch merge or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Protected missing-profile first boot candidate
+
+- Added optional missing-profile initialization in the single network owner and actual APSTA link. It independently reads the already-initialized protected store before initializing and again before opening a missing-profile setup window. Valid, corrupt, unavailable records never authorize automatic setup. Exactly one automatic opportunity on the first owner step; readiness arriving later cannot open AP until a physical BOOT gesture. The link passes missing/valid profile and physical authorization explicitly to the existing session policy. The ordinary valid-profile STA startup remains unchanged, with no provider or live listener.
+- Added six new shared-driver test cases: first_normal, first_late, first_error, first_unavailable, first_valid, first_changed; tests check first-window expiry, no automatic reopen, physical reopen and no connection without a stored profile. Candidate not built or tested yet. Authenticated save-to-STA from a missing profile is NOT wired; identity provider, sender lifetime, physical validation and phone transport remain blockers.
+- Previous source 92b1d4156ec5d3fdc6074a22af88853723ab69ae passed 16 GCC ASan/UBSan scenarios and ESP32-C3 build in 45780310660, artifact 15098680102, digest 6f8d1ea09a6c68c009c9994e7c9ffe44313ca3977930251ae2e2ec84af3683cd (CI digest, independent verification pending). Clang absent.
+- No eFuse/key generation, startup activation, protected branch merge, deployment, paid CI or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Combined real-adapter host integration fixture
+
+- Added a shared SDK mock for actual room_wifi_idf, room_wifi_apsta_link, room_apsta_task, events, session and Security2 transport adapter; the cryptographic SDK remains a synthetic mock, no network/phone traffic. The single driver mock asserts exclusive init, complete cleanup and barrier order. Six independent process cases: disconnect, expiry, revoked readiness, unavailable provider, rejected prepare and partial AP start; seventh case stalls STA cleanup and confirms quarantine. The test also checks protected profile reload and disabled AP event capture during STA.
+- New fixture not yet compiled or executed. Previous c5a7f63629ba9df7f879106e59f4f19643694b06 target build and nine GCC ASan/UBSan scenarios passed in 45779558292, artifact 15097602319, CI digest 274fcfd4da7b65eceb17dc02f38aab1c754b43aef8e77b6ba75588af66e38046. Clang unavailable in CI; independent archive verification pending.
+- No production source changes, startup activation, real identity material, phone listener, eFuse changes, merge or deployment. Remaining: actual provider/lifetime, first-boot, phone transport and physical testing; MQTT follows.
+
+---
+
+# 2026-11-26 — Single network owner adapter candidate
+
+- Optional, uncalled STA/APSTA binding: the existing wifi_owner policy dispatches both real adapters, and the STA adapter binds to its actual task handle. The optional APSTA link wraps the real persistent room_apsta_task, only accepts a trusted local provider after STA initialization and before first radio start, and does not expose any packet or listener API. Physical BOOT remains the only manual setup trigger. Normal startup is unchanged and supplies no provider. Missing/corrupt first-boot setup is still not wired.
+- APSTA ownership is claimed before start (including partial failure); STA cannot restart while APSTA cleanup is incomplete. Shared 5 s cleanup deadline quarantines the Wi-Fi owner on timeout, with no forced reset. Setup deadline remains bounded by the original BOOT request; cancellation/readiness loss is handled by the owner. With the optional binding, credentials are wiped on STA cleanup and reloaded from the protected store before a new STA start. No new key generation or eFuse changes.
+- Added a real STA adapter / mock APSTA callback regression for physical BOOT, both barriers, no overlap, cancellation, and profile reload; actual APSTA adapter link is compiled in the target but still needs its own combined SDK integration fixture. New code and tests have not yet been built or executed. Prior static queue commit 8f228ceec291d75ea06adb9be76ef03834b4f907 passed target build and all five GCC tests in run 45778698977.
+- Still required: combined adapter fixture, verified identity provider and sender/credential lifetime, protected storage and first-boot handling, real DHCP freshness, heap/stack and physical Wi-Fi tests, and then MQTT. No startup activation, live listener, deployment, merge to protected PR #17, dependency changes or paid CI.
+
+---
+
+# 2026-11-26 — Dedicated APSTA static queue candidate
+
+- APSTA task context now embeds one static FreeRTOS queue with eight room_apsta_event records; the owner no longer accepts an arbitrary caller-supplied queue handle. No per-window allocation/free. Bind is single-use, rejects missing task or queue creation failure before callback registration, and retains persistent context on ambiguous registration failure. Context must be zero-initialized once and never moved/freed before reboot. Eight records is the existing mock capacity, not a measured hardware sizing guarantee.
+- Added regression checks for the actual queue length/item size/backing storage, allocation failure before registration and duplicate bind rejection. New candidate is not yet tested or built. Previous source 89087c8062e0b0bb8d1a4111b7e6573eb50ef5a1 passed target build and all five GCC ASan/UBSan tests in CI 45777612825, artifact 15097126016 (CI digest 9f2d0ce62c8ddb20e2b3466bf1649cbe00c1a7662b43deef78233cdd11cfc367). Clang unavailable in CI; independent archive verification pending.
+- Still required: unified actual STA/APSTA owner, bounded cleanup, sender/identity/credential lifecycle, real DHCP freshness and physical heap/stack/queue measurements. No startup activation, protected branch merge, eFuse changes, new dependencies or deployment.
+
+---
+
+# 2026-11-26 — APSTA capture isolation candidate
+
+- Persistent event callbacks now ignore normal STA traffic outside the APSTA setup window. Capture starts only in the exclusive owner's open path and ends on successful full teardown (or rejected open before a window exists). Overflow remains sticky; the change never clears fault state. Caller must still prove station cleanup before opening APSTA. This gate does not establish freshness of events produced late by the SDK.
+- Added regression assertions for inactive callback traffic before first open, between windows, and after poisoned teardown. New candidate not yet compiled or executed. The separate CI run 45776861306 is pinned to the preceding BOOT fix 819ec2594c153860ec3b84a31749c7236c4eed87; do not attribute its result to this candidate.
+- Remaining: actual single-owner runtime handoff, shared cleanup contract, dedicated queue allocation, physical DHCP/event validation, identity and credential/phone transport gates. No runtime activation, no merge to protected PR #17, no dependency changes, no deployment or paid/private CI.
+
+---
+
+# 2026-11-26 — Deferred physical BOOT request during station cleanup
+
+- PR #23 isolated candidate: preserve authorized manual setup request while old transport stops asynchronously. No new start before successful stop; no repeat BOOT extends original 300 s window. Recheck setup readiness and deadline while waiting; cancel on readiness loss or expiry. Manual gesture has priority over ordinary STA retry in that step, and previous generation events cannot activate the new owner. No real AP activation or new credentials.
+- Exact owner header dc1074cbfc872cff9e9f0d2f36065ff0171c6720, new handoff test 16ed38314bd516a28c6b426e1884618558c5b71e, unchanged original owner test 8db32f6debfde00b2a858f4c5b07ce4b837d7f9c and policy c54bd7ee5916dbc050e4199dce58bb10d2000e06. Actual four local strict C11 ASan/UBSan runs passed (GCC 14.2.0 and Clang 17.0.0, new and existing owner tests).
+- Previous APSTA marker source 5cffd1dbb4592bd1bcb480c035bdc6e217135ff1 target build and GCC session/events/task integration tests passed in run 45775299132; Clang unavailable in CI image. Artifact 15095562424, CI digest c0b62194895adfb6a57849f449679ea86da2212851f15ec3a10d6f7904d15969; independent archive verification pending. New owner candidate target build pending.
+- Next: validate actual exclusive runtime handoff and bounded cleanup, dedicated queue allocation, real event/DHCP freshness, identity and credential disposal gates. Station-only runtime still passes setup_ready=false; no physical tests, activation, protected-branch merge, dependency changes, paid CI or Cloudflare changes.
+
+---
+
+# 2026-11-26 — Pretrial marker and poisoned queue cleanup candidate
+
+- Isolated PR #23 only, based on a58aee12e63bbf52e70ba84b484a0137ebed4f54. Do not merge into protected PR #17 baseline.
+- Trial cannot start in the task adapter until a distinct default event-loop marker has been acknowledged and the application event queue drained. An aborted pretrial marker is retired, never reused as a teardown marker.
+- Teardown uses bounded event discard after its own markers, independently of the sticky overflow fault. The fault continues to block new setup windows until controlled reboot. No overflow reset or automatic recovery is introduced.
+- Focused local adapter harness with the exact changed task and event C files, simplified SDK/session mocks: GCC and Clang strict C11 with ASan/UBSan both exit 0. Covered post failure/retry, delayed acknowledgement, pretrial stale event, overflow during operation/teardown and pending marker, independent teardown marker, and blocked reopen. Existing repository regression tests extended but not executed in this session. No target build or physical tests; default event-loop barrier is not independent proof of a new DHCP lease.
+- Next: run repository integration tests, audit and build exact candidate for ESP32-C3; verify actual event producer timing, lease freshness and physical AP/STA cleanup. Exclusive station handoff, queue allocation, identity, credential lifetime, phone transport, MQTT and hardware gates remain. No runtime activation, protected-branch merge, workflow/dependency changes, deployment, Cloudflare changes or paid CI.
+
+---
+
+# Isolated AP/STA follow-up — 2026-11-26
+
+Protected baseline 0043c1e9498f22228db950144c0f6665ec83cf23 (PR #17); separate experiment, no changes to protected branch. Require running DHCP client in addition to matching got-IP, live STA link and current IP. This is not proof of DHCP lease freshness; pretrial SDK event-loop barrier and physical testing still required. Stop pending Security 2 replies at the existing 2 s deadline without releasing sender-owned buffer before drain. Six actual host mock runs (session, events, task × GCC 14.2.0 / Clang 17.0.0, strict C11, ASan/UBSan) exit 0. No startup, live transport, new dependencies, workflow changes, hardware, deployment or target build. Previous target archive 15088994612 corrected SHA256: 0e6f102f495ccfc89b5b722433c0cbcce7e7b61796f4ed20b7c559bfb77a25fc (local verified). Next pretrial event barrier, overflow teardown, exclusive station handoff and queue allocation; identity/credential lifetime gates remain. No activation or merge.
+
+---
+
 # AP/STA task target footprint verified — 2026-11-26
 
-Run 45760537263 / job 139709205908 completed, all four steps success, actual 1008-step target compilation/link; full log 199492 characters/1696 lines, build and artifact markers present, metadata read token, pip check passed, only matched fatal line was exported-source git rev-parse without .git. Pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, CI PR #20 draft head 2edc69b96b4c3e45f7fff57f85c311926d377335, workflow blob 0004c5276af88f4930aa9c743bf6a456861e6485, merge test SHA 811a6d856f24b29e25dca4d26c3d67355812c4d2. Artifact 15088994612 independently downloaded: 4468301 bytes, SHA256 0e6f102f495ccfc89b5b728371ec17eaad01fa7f31fc8b05df977b07888f6b1e, CRC OK, 20 unique files, 19 manifest and 5 binary hashes verified, all 41 source paths match previous verified baseline plus 10 independently fetched new/changed blobs. App 894896 B SHA256 96c88cfda6b917ce963888cc2bb68c00a9da7c443c03c7ecc7e8193c24c89243 (+6272 vs 888624), 153680 B free in 1048576 B factory. Static DRAM 116622/321296 (+8), remain 204674. ELF 10032588 B, RISC-V, independent readelf confirms all six task APIs, events_unbind, four transport APIs and protocomm_security2. Partition report/binary, SDK image, submodule, Python and OS manifests unchanged byte-for-byte. Same 52 linked archives. Security 2 enabled, Security 0/1 disabled, SOFTAP support enabled, key -1. No actual startup call, queue allocation, real event execution/crypto/phone client or physical NVS, heap/stack proof. No new dependency, working branch merge, hardware/eFuse/OTA/heating or paid/private runner. Prior dependency/administrative gates remain. Target build pending entry superseded. Six mock tests verified in prior entry. Do not repeat unchanged build. Next actual station handoff, identity and decrypted-buffer disposal gate, bounded transport, physical DHCP/event barrier/recovery and dynamic RAM. Existing 5 s cleanup deadline provisional, cannot preempt SDK; queue overflow can quarantine radio, which is not proof it is off. No merge of CI PR #20.
+Run 45760537263 / job 139709205908 completed, all four steps success, actual 1008-step target compilation/link; full log 199492 characters/1696 lines, build and artifact markers present, metadata read token, pip check passed, only matched fatal line was exported-source git rev-parse without .git. Pinned source 647b0e4437a9f6125e313af0c315dbd56863e5b1, CI PR #20 draft head 2edc69b96b4c3e45f7fff57f85c311926d377335, workflow blob 0004c5276af88f4930aa9c743bf6a456861e6485, merge test SHA 811a6d856f24b29e25dca4d26c3d67355812c4d2. Artifact 15088994612 independently downloaded: 4468301 bytes, SHA256 0e6f102f495ccfc89b5b722433c0cbcce7e7b61796f4ed20b7c559bfb77a25fc, CRC OK, 20 unique files, 19 manifest and 5 binary hashes verified, all 41 source paths match previous verified baseline plus 10 independently fetched new/changed blobs. App 894896 B SHA256 96c88cfda6b917ce963888cc2bb68c00a9da7c443c03c7ecc7e8193c24c89243 (+6272 vs 888624), 153680 B free in 1048576 B factory. Static DRAM 116622/321296 (+8), remain 204674. ELF 10032588 B, RISC-V, independent readelf confirms all six task APIs, events_unbind, four transport APIs and protocomm_security2. Partition report/binary, SDK image, submodule, Python and OS manifests unchanged byte-for-byte. Same 52 linked archives. Security 2 enabled, Security 0/1 disabled, SOFTAP support enabled, key -1. No actual startup call, queue allocation, real event execution/crypto/phone client or physical NVS, heap/stack proof. No new dependency, working branch merge, hardware/eFuse/OTA/heating or paid/private runner. Prior dependency/administrative gates remain. Target build pending entry superseded. Six mock tests verified in prior entry. Do not repeat unchanged build. Next actual station handoff, identity and decrypted-buffer disposal gate, bounded transport, physical DHCP/event barrier/recovery and dynamic RAM. Existing 5 s cleanup deadline provisional, cannot preempt SDK; queue overflow can quarantine radio, which is not proof it is off. No merge of CI PR #20.
 
 ---
 

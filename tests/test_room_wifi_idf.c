@@ -1,9 +1,13 @@
 #include "mock_wifi_sdk.h"
 #include "room_wifi_idf.h"
+#include "freertos/task.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 static uint64_t clock_ms;
+static int task_owner, other_task;
+static TaskHandle_t current=&task_owner;
+TaskHandle_t xTaskGetCurrentTaskHandle(void){return current;}
 static bool initialized,allocated,attached,handlers,started,linked,down,fail_stop,fail_attach,fail_start,fail_post;
 static unsigned starts,stops,allocs,deinits;
 static uint32_t queued;
@@ -35,10 +39,35 @@ esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t *p) { assert(p && initialize
 bool esp_netif_is_netif_up(esp_netif_t *p) { assert(p==&ni && allocated);return p->up; }
 esp_err_t esp_netif_get_ip_info(esp_netif_t *p,esp_netif_ip_info_t *v) { assert(p==&ni && allocated && p->up);v->ip.addr=p->ip;return 0; }
 static bool step(uint64_t t) { clock_ms=t;return room_wifi_idf_step(NULL); }
+static bool setup_ready=true,setup_running,setup_stoppable,setup_poll_ok=true,load_ok=true;
+static unsigned setup_starts,setup_stops,profile_loads,binds;
+static bool bind_setup(void *v){(void)v;assert(!initialized);++binds;return true;}
+static bool ready_setup(void *v){(void)v;return setup_ready;}
+static bool start_setup(void *v,uint64_t deadline,room_wifi_profile profile,bool physical){(void)v;assert(profile==ROOM_WIFI_PROFILE_VALID&&physical);assert(!initialized&&!allocated&&!started&&!queued&&!setup_running&&clock_ms<deadline);setup_running=true;++setup_starts;return true;}
+static bool poll_setup(void *v){(void)v;assert(setup_running&&!initialized);return setup_poll_ok;}
+static bool stop_setup(void *v,room_wifi_setup_result *result){(void)v;assert(result&&setup_running&&!initialized);++setup_stops;if(!setup_stoppable)return false;setup_running=false;*result=ROOM_WIFI_SETUP_NO_SAVE;return true;}
+static bool load_profile(void *v,room_enroll_profile *p){(void)v;assert(!initialized&&!setup_running);++profile_loads;if(!load_ok)return false;*p=(room_enroll_profile){.ssid_len=9,.pass_len=9};memcpy(p->ssid,"synthetic",9);memcpy(p->pass,"test-only",9);return true;}
+static int handoff(void){
+    room_wifi_setup_io io={NULL,bind_setup,ready_setup,start_setup,poll_setup,stop_setup,load_profile};
+    current=&other_task;assert(!room_wifi_idf_bind_setup(io)&&!step(0)&&!starts);
+    current=&task_owner;assert(room_wifi_idf_bind_setup(io)&&binds==1&&!room_wifi_idf_bind_setup(io));
+    assert(!step(0)&&starts==1&&profile_loads==1);linked=true;ni.up=true;ni.ip=1;assert(step(50));
+    down=true;assert(step(100));assert(step(150));assert(!step(3150)&&queued&&stops==1&&!setup_starts);
+    assert(!step(4149)&&!setup_starts);deliver();
+    assert(!step(4150)&&queued&&deinits==1&&!setup_starts);deliver();
+    assert(!step(5150)&&setup_running&&setup_starts==1&&!initialized);
+    assert(!step(6000)&&setup_starts==1);
+    setup_poll_ok=false;assert(!step(6050)&&setup_running&&setup_stops==1&&starts==1);
+    assert(!step(7049)&&setup_stops==1);setup_stoppable=true;
+    assert(!step(7050)&&!setup_running&&starts==2&&profile_loads==2);
+    linked=true;ni.up=true;ni.ip=2;assert(step(7100));
+    puts("PASS: real STA adapter, physical BOOT, two teardown barriers, exclusive setup callback, abort cleanup and protected reload");return 0;
+}
 int main(int argc,char **argv) {
     assert(!room_wifi_idf_init((const uint8_t *)"x",1,(const uint8_t *)"short",5));
     assert(room_wifi_idf_init((const uint8_t *)"synthetic",9,(const uint8_t *)"test-only",9));
     assert(!room_wifi_idf_init((const uint8_t *)"synthetic",9,(const uint8_t *)"test-only",9));
+    if(argc>1 && !strcmp(argv[1],"handoff"))return handoff();
     if(argc>1 && !strcmp(argv[1],"attach")) {
         fail_attach=true;assert(!step(0) && allocs==1 && !starts);assert(!step(100000) && allocs==1 && !starts);puts("PASS: ambiguous attach fails closed");return 0;
     }

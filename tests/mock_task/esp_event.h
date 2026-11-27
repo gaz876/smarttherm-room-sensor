@@ -17,4 +17,6 @@ int esp_event_handler_instance_register(esp_event_base_t,int32_t,esp_event_handl
 int esp_event_handler_instance_unregister(esp_event_base_t,int32_t,esp_event_handler_instance_t);
 #define ESP_EVENT_DEFINE_BASE(x) static const char x[]=#x
 int esp_event_post(esp_event_base_t,int32_t,const void *,size_t,unsigned);
+int esp_event_loop_create_default(void);
+int esp_event_handler_register(esp_event_base_t,int32_t,esp_event_handler_t,void *);
 #endif

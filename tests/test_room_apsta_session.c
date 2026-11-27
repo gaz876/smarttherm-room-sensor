@@ -23,7 +23,10 @@ int main(void) {
     room_apsta_session_ip(&s,&ap,1);assert(!s.lease);
     assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_TRIAL);
     room_apsta_session_ip(&s,&sta,2);assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_TRIAL);
-    room_apsta_session_ip(&s,&sta,1);assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_VERIFIED);
+    room_apsta_session_ip(&s,&sta,1);
+    dhcp_status=ESP_NETIF_DHCP_STOPPED;assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_TRIAL);
+    dhcp_status=ESP_NETIF_DHCP_STARTED;dhcp_error=true;assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_TRIAL);
+    dhcp_error=false;assert(room_apsta_session_step(&s,true)&&s.bridge.phone.enrollment.state==ENROLL_VERIFIED);
     f.now=101;assert(room_sec2_transport_exchange(&s.transport,false,save,sizeof(save),&out,&n)&&out[1]==ROOM_REPLY_SAVED&&f.writes==1);
     assert(room_apsta_session_step(&s,true)&&!stops);assert(room_sec2_transport_finish(&s.transport,true));
     assert(!room_apsta_session_close(&s,false,barrier,NULL)&&!stops&&s.bridge.window);
@@ -31,8 +34,12 @@ int main(void) {
     pre=true;assert(!room_apsta_session_close(&s,true,barrier,NULL)&&s.bridge.window&&destroys==2);
     post=true;assert(room_apsta_session_close(&s,true,barrier,NULL)&&!s.bridge.window&&!s.transport.bridge);
     reset();f.now=200;assert(room_apsta_session_open(&s,clock_ms,&f,PHONE_PROFILE_VALID,true,true,&store,ssid,1,key,16,&id,7));
-    room_apsta_session_lost(&s);assert(!room_apsta_session_step(&s,true));
-    assert(!room_apsta_session_close(&s,true,barrier,NULL));f.now=5200;
+    assert(room_sec2_transport_exchange(&s.transport,true,hs,sizeof(hs),&out,&n));
+    f.now=2199;assert(room_apsta_session_step(&s,true)&&s.transport.pending);
+    f.now=2200;assert(!room_apsta_session_step(&s,true)&&s.transport.stopped&&s.transport.pending&&s.transport.reply==out);
+    assert(!room_apsta_session_close(&s,false,barrier,NULL)&&!stops);
+    assert(!room_sec2_transport_finish(&s.transport,true)&&!s.transport.pending);
+    assert(!room_apsta_session_close(&s,true,barrier,NULL));f.now=7200;
     assert(!room_apsta_session_close(&s,true,barrier,NULL)&&s.locked&&s.bridge.window);
     /* Release only the fake allocation after testing permanent quarantine. */
     protocomm_delete(s.transport.sec.pc);

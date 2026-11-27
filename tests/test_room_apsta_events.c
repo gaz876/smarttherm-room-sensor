@@ -23,6 +23,9 @@ unsigned uxQueueMessagesWaiting(QueueHandle_t q){assert(q==records);return count
 int main(void) {
     room_apsta_events e={0};room_apsta_session s={0};
     assert(room_apsta_events_bind(&e,records));assert(!room_apsta_events_bind(&e,records));
+    for(unsigned i=0;i<10;i++)handler[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&!atomic_load(&e.overflow)&&!atomic_load(&e.accepting));
+    assert(room_apsta_events_begin(&e)&&!room_apsta_events_begin(&e));
     s.radio.phase=APSTA_RUNNING;s.radio.trial=1;s.radio.sta=&sta;s.bridge.window=1;
     ip_event_got_ip_t got={.esp_netif=&ap,.ip_info={.ip={.addr=1}}};
     handler[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&got);
@@ -34,6 +37,12 @@ int main(void) {
     s.bridge.stopping=false;
     for(unsigned i=0;i<3;i++)handler[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&got);
     assert(!room_apsta_events_poll(&e,&s)&&s.bridge.stopping&&!s.lease);
+    assert(room_apsta_events_discard(&e)&&!count&&atomic_load(&e.overflow));
+    assert(!room_apsta_events_poll(&e,&s)&&!s.lease);
+    room_apsta_events_end(&e);
+    assert(!room_apsta_events_begin(&e));
+    for(unsigned i=0;i<10;i++)handler[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&atomic_load(&e.overflow));
     assert(room_apsta_events_unbind(&e)&&!handler[0]&&!handler[1]);
     assert(!room_apsta_events_poll(&e,&s)&&!room_apsta_events_bind(&e,records));
     puts("APSTA SDK events mock PASS");return 0;

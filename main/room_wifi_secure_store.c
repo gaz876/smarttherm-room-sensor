@@ -78,3 +78,23 @@ static bool write_profile(void *ctx,const room_enroll_profile *p) {
     return ok;
 }
 room_enroll_store room_secure_store(void) { return (room_enroll_store){NULL,usable,write_profile,read_profile}; }
+
+/* Same explicitly initialized encrypted partition; separate namespace.
+ * Identity corruption disables setup, but must not erase or overwrite the
+ * router profile. Storage readiness remains independently enforced. */
+room_secure_status room_secure_identity_load(room_setup_identity *out) {
+    if(!out)return ROOM_SEC_ERROR;
+    enroll_wipe(out,sizeof(*out));
+    if(!usable(NULL))return ROOM_SEC_UNAVAILABLE;
+    nvs_handle_t h;
+    esp_err_t err=nvs_open_from_partition(PART,"setup_id",NVS_READONLY,&h);
+    if(err==ESP_ERR_NVS_NOT_FOUND)return ROOM_SEC_MISSING;
+    if(err!=ESP_OK)return ROOM_SEC_ERROR;
+    uint8_t bytes[ROOM_ID_RECORD_SIZE]={0};size_t n=sizeof(bytes);
+    err=nvs_get_blob(h,"identity",bytes,&n);nvs_close(h);
+    room_secure_status result=ROOM_SEC_ERROR;
+    if(err==ESP_ERR_NVS_NOT_FOUND)result=ROOM_SEC_MISSING;
+    else if(err==ESP_OK&&room_id_decode(out,bytes,n))result=ROOM_SEC_VALID;
+    enroll_wipe(bytes,sizeof(bytes));
+    return result;
+}

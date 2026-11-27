@@ -1,0 +1,108 @@
+#include "room_wifi_apsta_link.h"
+#include "room_wifi_secure_store.h"
+#include "esp_timer.h"
+
+/* Lifetime is the boot; the persistent queue and registered callbacks must
+ * never reference a freed or moved context. This code is linked but uncalled
+ * by normal startup. Only the station owner's task can bind it. */
+static struct {
+    room_apsta_task task;
+    room_phone_channel channel;
+    room_phone_io io;
+    bool io_bound;
+    room_enroll_store store;
+    room_wifi_apsta_provider provider;
+    uint64_t prior_save;
+    bool attempted;
+} a;
+static uint64_t now_ms(void) { return (uint64_t)(esp_timer_get_time()/1000); }
+static bool bind(void *ctx) {
+    (void)ctx; a.store=room_secure_store();
+    return room_apsta_task_bind(&a.task);
+}
+static bool ready(void *ctx) {
+    (void)ctx;
+    return a.task.ready && !a.task.failed && !a.task.session.locked &&
+        !atomic_load(&a.task.events.overflow) &&
+        enroll_ready(&a.store) && a.provider.ready(a.provider.ctx);
+}
+static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool physical_boot) {
+    (void)ctx;
+    a.prior_save=a.task.session.bridge.phone.saved_generation;
+    if (now_ms()>=deadline || !ready(NULL) ||
+        (profile!=ROOM_WIFI_PROFILE_VALID && profile!=ROOM_WIFI_PROFILE_MISSING) ||
+        (!physical_boot && profile!=ROOM_WIFI_PROFILE_MISSING)) return false;
+    if (profile==ROOM_WIFI_PROFILE_MISSING) {
+        room_enroll_profile check={0};
+        room_secure_status status=room_secure_load(&check);
+        enroll_wipe(&check,sizeof(check));
+        if (status!=ROOM_SEC_MISSING) return false;
+    }
+    phone_profile_state phone_profile=profile==ROOM_WIFI_PROFILE_MISSING?PHONE_PROFILE_MISSING:PHONE_PROFILE_VALID;
+    room_wifi_apsta_window p={0};
+    bool prepared=a.provider.prepare(a.provider.ctx,&p);
+    const protocomm_security2_params_t identity={.salt=p.salt,.salt_len=p.salt_len,
+        .verifier=p.verifier,.verifier_len=p.verifier_len};
+    bool ok=prepared && ready(NULL) &&
+        now_ms()<deadline && p.key_len>=16 &&
+        enroll_profile_valid(p.ssid,p.ssid_len,p.key,p.key_len) &&
+        p.salt_len>=8 && p.salt_len<=sizeof(p.salt) &&
+        p.verifier_len==sizeof(p.verifier) && p.sdk_id && p.sdk_id!=UINT32_MAX &&
+        room_apsta_task_open(&a.task,phone_profile,physical_boot,true,&a.store,
+            p.ssid,p.ssid_len,p.key,p.key_len,&identity,p.sdk_id);
+    enroll_wipe(&p,sizeof(p));
+    if (ok && a.task.session.bridge.phone.deadline>deadline)
+        a.task.session.bridge.phone.deadline=deadline;
+    if(ok && a.io_bound)ok=room_phone_channel_open(&a.channel,&a.task,a.io);
+    return ok;
+}
+static bool poll(void *ctx) {
+    (void)ctx;
+    return a.io_bound?room_phone_channel_poll(&a.channel):room_apsta_task_poll(&a.task);
+}
+static bool stop(void *ctx,room_wifi_setup_result *result) {
+    (void)ctx;
+    room_apsta_session *s=&a.task.session;
+    if (!result) return false;
+    if(a.io_bound&&!room_phone_channel_close(&a.channel))return false;
+    if(s->locked||s->radio.phase==APSTA_LOCKED)return false;
+    if (!s->bridge.window) {
+        if (s->radio.phase!=APSTA_IDLE || s->transport.bridge ||
+            s->transport.pending || a.task.pending ||
+            atomic_load(&a.task.events.accepting)) return false;
+    } else {
+        /* Optional backend has already confirmed drain. Without a backend,
+         * never claim drain while a test/other local sender still owns reply. */
+        bool drained=!s->transport.pending && !s->transport.dispatching;
+        if (!room_apsta_task_close(&a.task,drained)) return false;
+    }
+    const room_phone_setup *p=&s->bridge.phone;
+    *result=p->enrollment.storage_uncertain?ROOM_WIFI_SETUP_UNCERTAIN:
+        p->saved_generation>a.prior_save?ROOM_WIFI_SETUP_COMMITTED:ROOM_WIFI_SETUP_NO_SAVE;
+    a.prior_save=p->saved_generation;
+    return true;
+}
+static bool load(void *ctx,room_enroll_profile *p) {
+    (void)ctx; return room_secure_load(p)==ROOM_SEC_VALID;
+}
+bool room_wifi_apsta_link_bind(room_wifi_apsta_provider provider) {
+    if (!room_wifi_idf_is_owner() || a.attempted || !provider.ready || !provider.prepare) return false;
+    a.attempted=true; a.provider=provider;
+    return room_wifi_idf_bind_setup((room_wifi_setup_io){NULL,bind,ready,start,poll,stop,load});
+}
+
+bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider provider) {
+    if (!provider.ready || !provider.prepare || a.attempted || room_wifi_idf_is_owner()) return false;
+    room_enroll_profile p={0};
+    room_secure_status status=room_secure_load(&p);
+    enroll_wipe(&p,sizeof(p));
+    if (status!=ROOM_SEC_MISSING) return false;
+    return room_wifi_idf_init_missing() && room_wifi_apsta_link_bind(provider);
+}
+
+bool room_wifi_apsta_link_attach_io(room_phone_io io) {
+    if(!room_wifi_idf_is_owner()||!a.attempted||!a.task.ready||a.io_bound||
+        a.task.session.bridge.last_window||a.channel.attempted||
+        !io.open||!io.receive||!io.send||!io.close)return false;
+    a.io=io;a.io_bound=true;return true;
+}

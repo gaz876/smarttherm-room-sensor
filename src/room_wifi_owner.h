@@ -2,7 +2,7 @@
 #define ROOM_WIFI_OWNER_H
 #include "room_wifi_policy.h"
 
-typedef enum { WIFI_EVENT_NONE, WIFI_EVENT_IP, WIFI_EVENT_LOST, WIFI_EVENT_SETUP_SAVED } room_wifi_event_kind;
+typedef enum { WIFI_EVENT_NONE, WIFI_EVENT_IP, WIFI_EVENT_LOST, WIFI_EVENT_SETUP_SAVED, WIFI_EVENT_SETUP_ABORTED } room_wifi_event_kind;
 typedef struct { room_wifi_event_kind kind; uint64_t generation; } room_wifi_event;
 typedef struct {
     void *ctx;
@@ -16,7 +16,7 @@ typedef struct {
     room_wifi_policy policy;
     room_wifi_transport io;
     uint64_t generation, active, cleanup_at;
-    bool dirty, exhausted;
+    bool dirty, exhausted, pending_setup;
 } room_wifi_owner;
 static inline bool wifi_owner_stop(room_wifi_owner *o,uint64_t now) {
     o->active=0;
@@ -34,7 +34,11 @@ static inline void wifi_owner_abort_start(room_wifi_owner *o,uint64_t now) {
 }
 static inline void wifi_owner_action(room_wifi_owner *o,room_wifi_action action,uint64_t now) {
     if (action==ROOM_WIFI_NONE) return;
-    if (!wifi_owner_stop(o,now)) { wifi_owner_abort_start(o,now); return; }
+    if (!wifi_owner_stop(o,now)) {
+        if (action==ROOM_WIFI_START_SETUP) o->pending_setup=true;
+        else wifi_owner_abort_start(o,now);
+        return;
+    }
     if (action==ROOM_WIFI_STOP) return;
     if (o->generation==UINT64_MAX) {
         o->exhausted=true; o->policy.state=ROOM_WIFI_OFF; return;
@@ -57,18 +61,33 @@ static inline void wifi_owner_init(room_wifi_owner *o,room_wifi_transport io,roo
  * SETUP_SAVED is a trusted local result of authenticated, verified persistence. */
 static inline void wifi_owner_step(room_wifi_owner *o,uint64_t now,bool manual,bool setup_ready,room_wifi_event e) {
     if (o->exhausted) return;
+    /* Latch a one-shot authorized BOOT gesture even during asynchronous
+     * cleanup. The original setup deadline is never extended by retries. */
+    if (manual && setup_ready && now!=UINT64_MAX &&
+        wifi_manual(&o->policy,now,true)==ROOM_WIFI_START_SETUP) o->pending_setup=true;
+    if (o->pending_setup && (!setup_ready || now>=o->policy.deadline)) {
+        o->pending_setup=false;
+        wifi_owner_abort_start(o,now);
+    }
     if (o->dirty && !o->active) {
         if (now<o->cleanup_at || !wifi_owner_stop(o,now)) return;
     }
+    if (o->pending_setup) {
+        o->pending_setup=false;
+        wifi_owner_action(o,ROOM_WIFI_START_SETUP,now);
+        return;
+    }
     wifi_owner_action(o,wifi_tick(&o->policy,now),now);
     if (o->exhausted || (o->dirty && !o->active)) return;
-    if (manual) wifi_owner_action(o,wifi_manual(&o->policy,now,setup_ready),now);
     if (!o->active || e.generation!=o->active) return;
     if (e.kind==WIFI_EVENT_IP) wifi_got_ip(&o->policy);
     else if (e.kind==WIFI_EVENT_LOST && (o->policy.state==ROOM_WIFI_CONNECTING || o->policy.state==ROOM_WIFI_ONLINE)) {
         wifi_failed(&o->policy,now); (void)wifi_owner_stop(o,now);
     } else if (e.kind==WIFI_EVENT_SETUP_SAVED) {
         wifi_owner_action(o,wifi_setup_done(&o->policy,now,true),now);
+    } else if (e.kind==WIFI_EVENT_SETUP_ABORTED && o->policy.state==ROOM_WIFI_SETUP) {
+        wifi_owner_abort_start(o,now);
+        wifi_owner_action(o,ROOM_WIFI_STOP,now);
     }
 }
 static inline bool wifi_owner_online(const room_wifi_owner *o) {

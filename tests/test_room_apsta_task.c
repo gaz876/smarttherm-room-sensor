@@ -11,7 +11,10 @@ static void *args[3];
 static int handles[3],owner_id,other_id;
 static TaskHandle_t current=&owner_id;
 static int64_t us;
-static room_apsta_event records[8];
+static room_apsta_event records[ROOM_APSTA_QUEUE_DEPTH];
+static bool fail_queue;
+static unsigned queue_creates;
+static room_apsta_task *expected_queue_owner;
 static unsigned count;
 static uint32_t posted;
 static esp_event_base_t barrier_base;
@@ -31,21 +34,41 @@ int esp_event_post(esp_event_base_t b,int32_t id,const void *v,size_t n,unsigned
     assert(b==barrier_base&&!id&&n==sizeof(posted)&&!wait&&!posted);memcpy(&posted,v,n);return ESP_OK;
 }
 static void deliver_barrier(void){assert(posted);uint32_t token=posted;posted=0;handlers[2](args[2],barrier_base,0,&token);}
-int xQueueSend(QueueHandle_t q,const void *v,unsigned wait){assert(q==records&&!wait);if(count==8)return 0;records[count++]=*(const room_apsta_event*)v;return pdPASS;}
+QueueHandle_t xQueueCreateStatic(unsigned depth,unsigned item,uint8_t *storage,StaticQueue_t *control){
+    assert(expected_queue_owner && depth==ROOM_APSTA_QUEUE_DEPTH && item==sizeof(room_apsta_event));
+    assert(storage==(uint8_t *)expected_queue_owner->queue_storage && control==&expected_queue_owner->queue_control);
+    ++queue_creates;return fail_queue?NULL:records;
+}
+int xQueueSend(QueueHandle_t q,const void *v,unsigned wait){assert(q==records&&!wait);if(count==ROOM_APSTA_QUEUE_DEPTH)return 0;records[count++]=*(const room_apsta_event*)v;return pdPASS;}
 int xQueueReceive(QueueHandle_t q,void *v,unsigned wait){assert(q==records&&!wait);if(!count)return 0;*(room_apsta_event*)v=records[0];memmove(records,records+1,(--count)*sizeof(records[0]));return pdPASS;}
 unsigned uxQueueMessagesWaiting(QueueHandle_t q){assert(q==records);return count;}
 int main(void){
     room_apsta_task t={0};fake f={0};room_enroll_store store={&f,ready,write_record,read_record};
     const char salt[16]={0},verifier[384]={0};protocomm_security2_params_t id={salt,16,verifier,384};
     const uint8_t *out;size_t n;uint8_t hs[]={1},stage[29]={1,ROOM_SETUP_STAGE,1,8,'x','a','b','c','d','e','f','g','h'},save[26]={1,ROOM_SETUP_SAVE,0,0,0,0,0,0,0,1};
-    reset();assert(room_apsta_task_bind(&t,records));assert(!room_apsta_task_bind(&t,records));
+    reset();room_apsta_task bad={0};expected_queue_owner=&bad;fail_queue=true;
+    assert(!room_apsta_task_bind(NULL)&&!queue_creates);
+    assert(!room_apsta_task_bind(&bad)&&bad.failed&&queue_creates==1);
+    assert(!handlers[0]&&!handlers[1]&&!handlers[2]);
+    fail_queue=false;assert(!room_apsta_task_bind(&bad)&&queue_creates==1);
+    expected_queue_owner=&t;
+    assert(room_apsta_task_bind(&t));assert(!room_apsta_task_bind(&t)&&queue_creates==2);
+    for(unsigned i=0;i<20;i++)handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&!atomic_load(&t.events.overflow)&&!atomic_load(&t.events.accepting));
     current=&other_id;assert(!room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));assert(!calls);
     current=&owner_id;assert(!room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,false,&store,ssid,1,key,16,&id,7));
+    assert(!atomic_load(&t.events.accepting));
     assert(room_apsta_task_open(&t,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));
+    assert(atomic_load(&t.events.accepting));
     current=&other_id;assert(!room_apsta_task_poll(&t));assert(!room_apsta_task_packet(&t,true,hs,sizeof(hs),&out,&n));assert(!out&&!n);assert(!room_apsta_task_close(&t,true));assert(!stops);
     current=&owner_id;assert(room_apsta_task_packet(&t,true,hs,sizeof(hs),&out,&n));assert(room_apsta_task_sent(&t,true));
     us=1000;assert(room_apsta_task_packet(&t,false,stage,sizeof(stage),&out,&n));assert(room_apsta_task_sent(&t,true));
-    assert(room_apsta_task_poll(&t)&&connects==1);
+    assert(room_apsta_task_poll(&t)&&posted&&!connects&&t.pretrial_phase);
+    assert(room_apsta_task_poll(&t)&&!connects);
+    ip_event_got_ip_t stale={.esp_netif=&sta,.ip_info={.ip={.addr=1}}};
+    handlers[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&stale);
+    deliver_barrier();
+    assert(room_apsta_task_poll(&t)&&connects==1&&!t.session.lease&&!t.pending);
     linked=true;sta.up=true;sta.ip=1;
     ip_event_got_ip_t got={.esp_netif=&ap,.ip_info={.ip={.addr=1}}};
     handlers[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&got);assert(room_apsta_task_poll(&t)&&!t.session.lease);
@@ -57,10 +80,35 @@ int main(void){
     assert(!room_apsta_task_close(&t,true)&&stops==1&&!destroys);pre=true;deliver_barrier();
     assert(!room_apsta_task_close(&t,true)&&destroys==2&&deinits==1&&posted&&t.session.bridge.window);
     post=true;deliver_barrier();assert(room_apsta_task_close(&t,true)&&!t.session.bridge.window&&!t.pending);
+    assert(!atomic_load(&t.events.accepting));
+    for(unsigned i=0;i<20;i++)handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);
+    assert(!count&&!atomic_load(&t.events.overflow));
     reset();us=200000;assert(room_apsta_task_open(&t,PHONE_PROFILE_VALID,true,true,&store,ssid,1,key,16,&id,7));
     handlers[1](args[1],WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,NULL);assert(!room_apsta_task_poll(&t));
     assert(!room_apsta_task_close(&t,true)&&posted);us=5200000;assert(!room_apsta_task_close(&t,true)&&t.session.locked);
     /* Fake allocation only: the production context remains quarantined. */
     protocomm_delete(t.session.transport.sec.pc);
+    /* Independent fixture: overflow while the pretrial marker is outstanding.
+     * The old fixture was deliberately quarantined; only test mocks are reset. */
+    memset(handlers,0,sizeof(handlers));memset(args,0,sizeof(args));
+    posted=0;count=0;reset();us=6000000;
+    room_apsta_task u={0};expected_queue_owner=&u;assert(room_apsta_task_bind(&u)&&queue_creates==3);
+    assert(room_apsta_task_open(&u,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));
+    assert(room_apsta_task_packet(&u,true,hs,sizeof(hs),&out,&n));assert(room_apsta_task_sent(&u,true));
+    us+=1000;assert(room_apsta_task_packet(&u,false,stage,sizeof(stage),&out,&n));assert(room_apsta_task_sent(&u,true));
+    assert(room_apsta_task_poll(&u)&&posted&&!connects);
+    uint32_t obsolete=posted;
+    for(unsigned i=0;i<9;i++)handlers[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&stale);
+    assert(!room_apsta_task_poll(&u)&&u.session.bridge.stopping&&!u.session.lease);
+    assert(!room_apsta_task_close(&u,false)&&!stops);
+    assert(!room_apsta_task_close(&u,true)&&stops==1&&posted==obsolete&&!destroys);
+    pre=true;deliver_barrier();
+    assert(!room_apsta_task_close(&u,true)&&posted!=obsolete&&posted&&!destroys);
+    deliver_barrier();assert(!room_apsta_task_close(&u,true)&&destroys==2&&posted&&!count);
+    post=true;
+    for(unsigned i=0;i<9;i++)handlers[0](args[0],IP_EVENT,IP_EVENT_STA_GOT_IP,&stale);
+    deliver_barrier();assert(room_apsta_task_close(&u,true)&&!u.pending&&!count&&!u.session.bridge.window);
+    assert(atomic_load(&u.events.overflow)&&!atomic_load(&u.events.accepting)&&!connects&&!u.session.locked);
+    assert(!room_apsta_task_open(&u,PHONE_PROFILE_MISSING,false,true,&store,ssid,1,key,16,&id,7));
     puts("APSTA network task mock PASS");return 0;
 }
