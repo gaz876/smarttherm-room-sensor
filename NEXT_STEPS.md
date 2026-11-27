@@ -1,3 +1,10 @@
+# 2026-11-27 — Approved 2 MiB layout adopted in experimental candidate
+
+- User approved candidate adoption only. Base cd786d0de71d3824c8d84ea1fedda42d925d6a56 differs from the previously tested source 75df361f733973bd7d58e7bd856af96da28bdbb6 only in three journals (GitHub compare). Apply exact CSV transformation from successful PR #28 / run 45912021281: move factory to 0x120000 / 2 MiB, sort after room_wifi; no CMake, sdkconfig, runtime or workflow edits. Local arithmetic/structural checks passed: row order, all data entries identical, app alignment and size, nonoverlap and 4 MiB bounds, original factory range excluded.
+- Prior SDK-generated table and inert HTTPS build evidence retained; no fresh target compilation for this committed candidate yet. Prior experiment applied temporary HTTPS linkage that is NOT adopted here. No duplicate run for the identical CSV alone; next target build must verify actual candidate table hash b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246 and generated application offset. No device writes, OTA, protected merge or production release. Roll back source change by reviewed revert; hardware recovery not proven. Next: trusted browser interface design and validation, then isolated target build with actual candidate. Existing DHCP freshness, bounded shutdown, certificate trust, Security2 interoperability and physical flash/heap gates remain.
+
+---
+
 # 2026-11-27 — Offline 2 MiB partition experiment PASS
 
 - PR #28 head 3c6b04341752471b3d27a5468264d8e3ff5957e9, workflow blob 9535132ee46b53d95af3487f37a2341ea0cab4f9, run 45912021281 / job 140222386233 completed success, all three steps. Full log 240058 characters / 1842 lines; actual 1029/1029 build, BUILD_EXIT=0; SDK 6.1.1, GCC 15.2.0, source 75df361f733973bd7d58e7bd856af96da28bdbb6. Log lists 48 source blobs; four critical build/config inputs independently matched; full per-blob recheck hit connector call limit. Zero warning/error markers or common credential signatures detected in log; not full security clearance. Token Metadata read only; no artifacts.
