@@ -1,0 +1,87 @@
+name: ESP32-C3 SDK stop worker candidate
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/sdk-stop-worker-build.yml']
+permissions: {}
+concurrency:
+  group: sdk-stop-worker-build-20261127
+  cancel-in-progress: true
+jobs:
+  regression:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/sdk-stop-worker-build-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Offline host regressions and exact ESP32-C3 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          source_sha=18da1451b78b35f4cc07f66516e932c92bcdc674
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          cid=""
+          trap 'if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null; fi; rm -rf "$work"' EXIT
+          git init -q "$work/repo"
+          git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
+          test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
+          for pair in 329521c22855caaffe41753b1dcf34e4b08ed29d:main/room_sdk_stop.c 6c94a54f9f51f8cb767d51b2cc1b339964ec1202:src/room_sdk_stop.h e97fb7a025b22f82244e5d8b26acd89b6686ec77:tests/test_room_sdk_stop.c 546ebe4615e00e2288a69e9349cccac58120a6fc:tests/mock_sdk_stop/esp_http_server.h e46e29ec7864ec9461b56d1d37e020877fdca159:tests/mock_sdk_stop/esp_timer.h 32357be6340f5fd1604cf652b416531c0d69a257:tests/mock_sdk_stop/freertos/FreeRTOS.h f7a20becd7e7b65992fc4db486e5ed29117a6ddc:tests/mock_sdk_stop/freertos/task.h 03c90f47705ae1084f5ce48bb8e0493f8dd97116:main/CMakeLists.txt; do
+            expected="${pair%%:*}"
+            path="${pair#*:}"
+            test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
+          done
+          echo TEST_INPUT_BLOBS_OK
+          mkdir "$work/input"
+          git -C "$work/repo" archive "$source_sha" CMakeLists.txt main src sdkconfig.defaults tests/mock_sdk_stop tests/test_room_sdk_stop.c | tar -x -C "$work/input"
+          git -C "$work/repo" ls-tree -r "$source_sha" -- CMakeLists.txt main src sdkconfig.defaults tests/mock_sdk_stop tests/test_room_sdk_stop.c
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          cid="$(docker create --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/room_sensor
+            cp -R --no-preserve=ownership /input/. /tmp/room_sensor/
+            cd /tmp/room_sensor
+            gcc --version
+            gcc -std=c11 -Wall -Wextra -Werror -pedantic -g -O1 -pthread -fsanitize=address,undefined -fno-sanitize-recover=all -fno-pie -no-pie -Itests/mock_sdk_stop -Isrc main/room_sdk_stop.c tests/test_room_sdk_stop.c -o /tmp/sdk_stop_host
+            for scenario in normal late clock error invalid alloc; do
+              timeout 10 /tmp/sdk_stop_host "$scenario"
+              echo "SDK_STOP_HOST_OK=$scenario"
+            done
+            sha256sum main/partitions.csv sdkconfig.defaults
+            grep -qx "factory,app,factory,0x120000,2M," main/partitions.csv
+            generator="$IDF_PATH/components/partition_table/gen_esp32part.py"
+            python "$generator" --flash-size 4MB main/partitions.csv /tmp/new-table.bin
+            (cd /tmp; echo "b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246  new-table.bin" | sha256sum -c -)
+            idf.py set-target esp32c3
+            idf.py build
+            test -s build/room_sensor.elf
+            test -s build/room_sensor.bin
+            cmp build/partition_table/partition-table.bin /tmp/new-table.bin
+            echo GENERATED_TABLE_MATCH_OK
+            cmp sdkconfig.defaults /input/sdkconfig.defaults
+            grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
+            grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y" sdkconfig
+            if grep -Eq "^CONFIG_(ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_[01]|NVS_ENCRYPTION|SECURE_FLASH_ENC_ENABLED|SECURE_BOOT|SECURE_BOOT_V2_ENABLED)=y$" sdkconfig; then exit 1; fi
+            riscv32-esp-elf-nm build/room_sensor.elf > /tmp/symbols.txt
+            for sym in room_phone_channel_close room_sec2_transport_start room_apsta_task_poll room_wifi_apsta_link_attach_io protocomm_security2 room_sdk_stop_bind room_sdk_stop_request room_sdk_stop_poll; do
+              grep -E "[[:space:]]$sym$" /tmp/symbols.txt
+            done
+            idf.py size
+            bytes="$(stat -c %s build/room_sensor.bin)"
+            printf "CANDIDATE_BYTES=%s\nFACTORY_HEADROOM_BYTES=%s\n" "$bytes" "$((2097152-bytes))"
+            test "$bytes" -le 2097152
+            sha256sum build/room_sensor.bin build/partition_table/partition-table.bin
+            echo SDK_STOP_WORKER_BUILD_OK
+          ')"
+          docker start -a "$cid"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$cid")" = 0
