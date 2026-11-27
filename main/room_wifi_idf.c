@@ -101,7 +101,8 @@ static bool stop(void *ctx) {
         return true;
     }
     if (w.clean==CLEAN_NONE) {
-        if (w.attempted && esp_wifi_stop()!=ESP_OK) { (void)cleanup_live(); return false; }
+        /* No SDK guarantee of retry safety after an ambiguous stop. */
+        if (w.attempted && esp_wifi_stop()!=ESP_OK) { w.fatal=true; return false; }
         w.attempted=false; w.clean=CLEAN_STOPPED;
         if (!cleanup_live()) return false;
     }
@@ -121,7 +122,7 @@ static bool stop(void *ctx) {
         w.clean=CLEAN_DETACHED;
     }
     if (w.clean==CLEAN_DETACHED) {
-        if (w.driver && esp_wifi_deinit()!=ESP_OK) { (void)cleanup_live(); return false; }
+        if (w.driver && esp_wifi_deinit()!=ESP_OK) { w.fatal=true; return false; }
         w.driver=false; w.clean=CLEAN_DEINIT;
         if (!cleanup_live()) return false;
     }
