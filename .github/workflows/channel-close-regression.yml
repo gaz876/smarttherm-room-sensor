@@ -1,0 +1,87 @@
+name: ESP32-C3 channel close regression
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/channel-close-regression.yml']
+permissions: {}
+concurrency:
+  group: channel-close-regression-20261127
+  cancel-in-progress: true
+jobs:
+  regression:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/channel-close-regression-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Offline host regressions and exact ESP32-C3 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          source_sha=abe59e3c0e7f8e2c7099baf1ed34d8198dcdaa9e
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          cid=""
+          trap 'if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null; fi; rm -rf "$work"' EXIT
+          git init -q "$work/repo"
+          git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
+          test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
+          for pair in f3e3910d5b6cd45d497e8988aab45555a258d45e:main/room_phone_channel.c c19526cb359f85ebf35e3dc1fd3aae7dc4527a3e:src/room_phone_channel.h 72627fce588769277f17b582c3bad1b9d94aa3b9:tests/browser_worker/test_channel_close_retry.c be40b2441aa79b980c868fd79981d3971ed5bfd1:tests/browser_worker/mock_channel/room_apsta_task.h 18f88d159269cbe942f1b98738d18ed0a766af92:tests/browser_worker/test_channel_ack.c a2b3e1863f1a1daf4e7d5c11989018dd33dc5955:tests/browser_worker/test_channel_threads.c 362ff6b4257c57e6ffdf8913fb1e85aac824bc16:tests/browser_worker/test_channel_stop.c 47104a703fbae97821b0d163de594dc2a0eb8113:tests/browser_worker/completion_adapter.h c73f0dd25a66edd063f30d314a40b590acebe859:tests/browser_worker/mailbox.h bbb110d76bffede4942330ce7d59a99eca8af42d:tests/browser_worker/worker_model.h; do
+            expected="${pair%%:*}"
+            path="${pair#*:}"
+            test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
+          done
+          echo TEST_INPUT_BLOBS_OK
+          mkdir "$work/input"
+          git -C "$work/repo" archive "$source_sha" CMakeLists.txt main src sdkconfig.defaults tests/browser_worker | tar -x -C "$work/input"
+          git -C "$work/repo" ls-tree -r "$source_sha" -- CMakeLists.txt main src sdkconfig.defaults tests/browser_worker
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          cid="$(docker create --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/room_sensor
+            cp -R --no-preserve=ownership /input/. /tmp/room_sensor/
+            cd /tmp/room_sensor
+            gcc --version
+            for test_name in test_channel_ack test_channel_threads test_channel_stop test_channel_close_retry; do
+              gcc -std=c11 -Wall -Wextra -Werror -pedantic -g -O1 -pthread -fsanitize=address,undefined -fno-sanitize-recover=all -fno-pie -no-pie -include tests/browser_worker/mock_channel/room_apsta_task.h -Isrc -Itests/browser_worker main/room_phone_channel.c "tests/browser_worker/$test_name.c" -o "/tmp/$test_name"
+              timeout 30 "/tmp/$test_name"
+              echo "HOST_TEST_OK=$test_name"
+            done
+            sha256sum main/partitions.csv sdkconfig.defaults
+            grep -qx "factory,app,factory,0x120000,2M," main/partitions.csv
+            generator="$IDF_PATH/components/partition_table/gen_esp32part.py"
+            python "$generator" --flash-size 4MB main/partitions.csv /tmp/new-table.bin
+            (cd /tmp; echo "b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246  new-table.bin" | sha256sum -c -)
+            idf.py set-target esp32c3
+            idf.py build
+            test -s build/room_sensor.elf
+            test -s build/room_sensor.bin
+            cmp build/partition_table/partition-table.bin /tmp/new-table.bin
+            echo GENERATED_TABLE_MATCH_OK
+            cmp sdkconfig.defaults /input/sdkconfig.defaults
+            grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
+            grep -qx "CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y" sdkconfig
+            if grep -Eq "^CONFIG_(ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_[01]|NVS_ENCRYPTION|SECURE_FLASH_ENC_ENABLED|SECURE_BOOT|SECURE_BOOT_V2_ENABLED)=y$" sdkconfig; then exit 1; fi
+            riscv32-esp-elf-nm build/room_sensor.elf > /tmp/symbols.txt
+            for sym in room_phone_channel_close room_sec2_transport_start room_apsta_task_poll room_wifi_apsta_link_attach_io protocomm_security2; do
+              grep -E "[[:space:]]$sym$" /tmp/symbols.txt
+            done
+            idf.py size
+            bytes="$(stat -c %s build/room_sensor.bin)"
+            printf "CANDIDATE_BYTES=%s\nFACTORY_HEADROOM_BYTES=%s\n" "$bytes" "$((2097152-bytes))"
+            test "$bytes" -le 2097152
+            sha256sum build/room_sensor.bin build/partition_table/partition-table.bin
+            echo CHANNEL_CLOSE_REGRESSION_BUILD_OK
+          ')"
+          docker start -a "$cid"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$cid")" = 0
