@@ -1,3 +1,10 @@
+# 2026-11-27 — Exact committed ESP32-C3 candidate build PASS
+
+- PR #33 closed without merge after run 45944680171 / job 140326558444 completed successfully; all three steps, full log 234129 characters / 1793 lines. Source c316fa8ffbb6f168463f7ac8ecda51b736f49ff4, workflow 582956eac7fbdfb8c191733c4816be681f4e143b / blob 94ce5de331d0dbb0f6e3211e9b3db28fb9016638. ESP-IDF 6.1.1, GCC 15.2.0. BUILD_EXIT=0, COMMITTED_CANDIDATE_BUILD_OK, CANDIDATE_BUILD_OK; generated partition matches approved CSV and flash offset 0x120000. App 934224 bytes, factory headroom 1162928 bytes, static DRAM 112812/321296 bytes. Partition SHA256 b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246; app SHA256 ac16cf7d3ba0dfcf3014b9a1aeb7e715b5077c7f096d259b4c779f5f2be7c2e5 as logged. Four required linked symbols and default safety configuration checks passed. Token Metadata read; zero artifacts, no independent binary download. No compiler warning/error markers found; full administrative/dependency audit remains incomplete.
+- Next: review real bounded phone backend, owner-only Wi-Fi handoff, actual worker exit/drain and secure browser trust/storage; integrate only after review and test. Default networking remains disabled; no actual network, hardware, flash, OTA or protected code merge. No duplicate CI for unchanged source. Prior pending entry is historical.
+
+---
+
 # 2026-11-27 — Exact committed ESP32-C3 candidate build started
 
 - Integrated build inputs: all 48 paths independently compared with prior qualified source 75df361f733973bd7d58e7bd856af96da28bdbb6; only approved main/partitions.csv differs (blob 465649e490ecb7fb04a459f38430dd5bf00614a4). Current source c316fa8ffbb6f168463f7ac8ecda51b736f49ff4. The actual room_network.c starts only the valid-profile STA path; missing profile does not authorize AP and experimental phone link is not activated. HMAC key ID -1 keeps networking disabled in default candidate. Tests/browser_worker are not linked into firmware.
