@@ -1,3 +1,11 @@
+# 2026-11-27 — ESP32-C3 clock/synchronization compile-link PASS
+
+- PR #29, head ccf4f2ec264f7467ded1b5b44332f008fafc4b9b, workflow fc838f094208be373969811b0d7a779447ab1d72, run 45920972097 / job 140251360914: success, all three steps. Full log reviewed: 1017/1017, real ELF and binary, CLOCK_SYNC_COMPILE_LINK_OK; SDK 6.1.1, GCC 15.2.0, exact pinned mailbox and worker headers verified by successful workflow hash checks. ELF elf32-littleriscv includes room_sync_probe, room_sync_init, room_sync_clock, room_sync_atomic_capability and esp_timer_get_time. Probe binary 0x25360 bytes; standalone default layout, NOT the candidate partition or firmware size.
+- Disassembly of room_sync_atomic_capability returns 1 (sometimes lock-free), not 2; no guarantee of lock-free operation or bounded scheduling on the device. SDK Kconfig deprecation/choice notices present; no compiler warning/error markers found in reviewed log. Token Metadata: read, zero artifacts. No actual probe execution, Wi-Fi, flash, OTA or protected-branch merge. Administrative security visibility remains limited.
+- Compile/link gate satisfied for the isolated model only. Close PR #29 without merge, preserve source and run. Next: offline copied-buffer send completion contract and mock integration tests; actual ESP32-C3 task scheduling, timer latency, TLS trust and resource quiescence remain unverified. Do not activate networking or alter production configuration. Prior pending entry below is historical.
+
+---
+
 # 2026-11-27 — ESP32-C3 clock and synchronization compatibility probe
 
 - Source review: ESP-IDF 6.1.1 commit 051e4c4eb20346e043cdd47bc388fde75ff8af63, esp_timer.h blob e48a213634d3e2cd6ba1dec657687a756d48c291, stdatomic.c 428a800eca518e00b17ead979b2c7acef5aa9633, esp_stdatomic.h a988075a6ffd3022b6be10e5c0d038467ec2b41c. SDK provides software atomic operations on single-core targets without native A extension using interrupt masking. esp_timer_get_time returns signed 64-bit microseconds; documented fast nonlocking reads, deep-sleep resets clock; discard session across restart. https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/system/esp_timer.html
