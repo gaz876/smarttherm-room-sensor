@@ -11,14 +11,14 @@ typedef enum { W_DOWN, W_START, W_IDLE, W_REQUEST, W_REPLY, W_STOP, W_LOCKED } w
 typedef struct {
     worker_phase phase;
     uint64_t window, last_window, ticket, deadline, stop_deadline, last_time;
-    bool clock_seen, fault;
+    bool clock_seen, fault, owner_budget;
 } worker_model;
 static inline uint64_t worker_limit(uint64_t now, uint64_t duration) {
     return now > UINT64_MAX-duration ? UINT64_MAX : now+duration;
 }
 static inline void worker_stop(worker_model *w, uint64_t now) {
     if (w->phase==W_DOWN || w->phase==W_STOP || w->phase==W_LOCKED) return;
-    w->phase=W_STOP; w->deadline=0; w->stop_deadline=worker_limit(now,2000);
+    w->phase=W_STOP; w->deadline=0; w->stop_deadline=w->owner_budget?0:worker_limit(now,2000);
 }
 static inline void worker_tick(worker_model *w, uint64_t now) {
     if (w->clock_seen && now<w->last_time) {
@@ -27,7 +27,7 @@ static inline void worker_tick(worker_model *w, uint64_t now) {
     w->clock_seen=true; w->last_time=now;
     if ((w->phase==W_START || w->phase==W_REQUEST || w->phase==W_REPLY) && now>=w->deadline)
         worker_stop(w,now);
-    if (w->phase==W_STOP && now>=w->stop_deadline) {
+    if (w->phase==W_STOP && w->stop_deadline && now>=w->stop_deadline) {
         w->phase=W_LOCKED; w->fault=true;
     }
 }
@@ -64,7 +64,7 @@ static inline bool worker_sent(worker_model *w,uint64_t now,uint64_t window,uint
  * Even a late valid report cannot unlock a timed-out worker for reuse. */
 static inline bool worker_drained(worker_model *w,uint64_t now,uint64_t window,bool exited,bool drained) {
     worker_tick(w,now);
-    if (w->phase!=W_STOP || window!=w->window || !exited || !drained || w->fault) return false;
+    if (w->phase!=W_STOP || window!=w->window || !exited || !drained || !w->stop_deadline || w->fault) return false;
     w->phase=W_DOWN; w->window=0; w->stop_deadline=0; return true;
 }
 #endif
