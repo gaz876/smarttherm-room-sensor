@@ -1,3 +1,12 @@
+# 2026-11-27 — Multi-exchange offline phone channel regression
+
+- Base a2bff1b9176b9b1d61c4bbaa4072cd40704fa785. Extended existing test_channel_ack.c only; actual channel source and mock unchanged. 100 sequential exchanges within one open session, increasing tickets and distinct response bytes, reject stale send and receipt events, reject duplicate receipt, wait before consumption and block next submit until receipt consumed. Stop under simulated busy lock blocks owner polling even if sender completes before stop reaches mailbox; owner poll failure precedes ready receipt. No actual network, firmware, dependency or workflow changes.
+- Actual GCC 14.2.0 and Clang 17.0.0 strict C11 ASan/UBSan, same compile flags and command as previous entry, each timeout 10 s, exit 0, 1823 checks PASS per compiler (includes previous integration cases as necessary regression). Test blob 18f88d159269cbe942f1b98738d18ed0a766af92, SHA256 f96db429100dd8206ad7ddadc93108d7062c323094d93858530ef2c39678d928. Local actual channel and mock verified against previous Git blobs; no new CI. Diff command exit 1 denotes expected differences, not failed tests.
+- Limitations: serialized fixture with simulated contention and owner poll failure, not a real task deadline implementation or hardware proof. Prior public history audit limited to recorded checkpoint plus heuristic review; admin secret visibility remains incomplete. No private data introduced, no new executable code outside tests, no change to protected branches, no deployment or OTA.
+- Next: separate two-thread actual channel integration with owner-only channel access and synchronized mock transport state, test stop/expiry under real contention; review actual task close failure and resource lifetime before SDK integration. Revert isolated test commit if needed.
+
+---
+
 # 2026-11-27 — Offline actual phone channel integration
 
 - Base 84f1c760bbf36df6e7703673c0b73eed16d40e1f. Rechecked existing local adapter and mailbox Git blobs and public journals, no repeat of prior CI. Direct raw download failed DNS (curl exit 6); reconstructed unchanged main/room_phone_channel.c and src/room_phone_channel.h from connector, verified exact blobs ce7369f90833bd796ed2dab0b11579c637f6b487 and ef0c5d44c5a32ac190b71fb38000da876d8ad618.
