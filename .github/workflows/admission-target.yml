@@ -1,4 +1,4 @@
-name: ESP32-C3 isolated admission target qualification
+name: ESP32-C3 isolated HTTP lifecycle qualification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -15,13 +15,13 @@ jobs:
     timeout-minutes: 25
     permissions: {}
     steps:
-      - name: Build exact public candidate and run isolated admission probe
+      - name: Build exact public candidate and run isolated HTTP lifecycle probe
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=87a3b96af29c0a373aa8469b68ad8ea010f7dea3
+          source_sha=3a0674ec41001a6239750056ed69de67008769d2
           image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
@@ -42,7 +42,7 @@ jobs:
           2cb387be7968260e196bdd54756c0a5e92514278 main/room_network.h
           74182937582e0f369bf15c9bd91ae2608a2ca808 main/room_phone_channel.c
           d72683b31eb8a58f7aa77cabdb334bb08f94c6f5 main/room_runtime.h
-          329521c22855caaffe41753b1dcf34e4b08ed29d main/room_sdk_stop.c
+          333b7ff9c53f1aa27473976ab9a725170aaf228f main/room_sdk_stop.c
           6b3f13ec16732752ed7a3f08e01e996e8fa5a73a main/room_sec2_transport.c
           a39ef2c243fddf4352f1a1109bd6318dc2ca31c2 main/room_settings_nvs.h
           35082fd814ed10571d342bf4afd3dda48e7c89e2 main/room_wifi_apsta_link.c
@@ -69,7 +69,8 @@ jobs:
           0449024abccb96c1429b9cfc2590a7659289d124 src/room_memory_probe.h
           466acbce314ef0554df0527dae2784e1baf32c92 src/room_phone_channel.h
           5953780458aee41ada193557ca0404bd27e9d8e6 src/room_phone_setup.h
-          6c94a54f9f51f8cb767d51b2cc1b339964ec1202 src/room_sdk_stop.h
+          aabb0d77274bef6828887cb9ec380416b519306e src/room_sdk_stop.h
+          f5ef673856a0643b2ab168bd9195b977458f008d src/room_http_lifecycle.h
           aba28c7626f4690783b3f9d9a6ad6e1482092ab9 src/room_sec2_context.h
           61cf3382f5203ce16b943a604166dfadeca0c8c6 src/room_sec2_transport.h
           8c5df62decaecf856ca4373baa3fb64adb4c37c3 src/room_settings.h
@@ -83,18 +84,18 @@ jobs:
           c54bd7ee5916dbc050e4199dce58bb10d2000e06 src/room_wifi_policy.h
           cc9dc7317de93b38ff49a5dba98af96d3c3c4385 src/sht40.c
           d40ace0c443e6d96e7a7eaa356e491494f330395 src/sht40.h
-          eaa8053cc60c57a9931e35f7ea8aefbf7a5088d7 tests/admission_target_probe/CMakeLists.txt
-          13e3549c0fe5628a94e7d2a264058164461d00f5 tests/admission_target_probe/main/CMakeLists.txt
-          7f5e4a0d97abd02b9150a9cca46618ba7a2b5f2f tests/admission_target_probe/main/probe.c
+          db6b03c7222ca7b055cd42199bf85f5f12f3ba65 tests/http_lifecycle_target_probe/CMakeLists.txt
+          1f7d6488bbaecf58b4dc7cf1b2570237daa299f7 tests/http_lifecycle_target_probe/main/CMakeLists.txt
+          9933cc23b9e79b2cd61a5ecd65affcdd42ca5429 tests/test_room_http_lifecycle_worker.c
           MANIFEST
-          test "$(wc -l < "$work/manifest")" = 56
+          test "$(wc -l < "$work/manifest")" = 57
           while read -r expected path; do
             test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
             mkdir -p "$work/input/$(dirname "$path")"
             git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
             test "$(git hash-object "$work/input/$path")" = "$expected"
           done < "$work/manifest"
-          echo TARGET_INPUT_BLOBS_OK=56
+          echo TARGET_INPUT_BLOBS_OK=57
           echo SOURCE_SHA="$source_sha"
           curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
           test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
@@ -134,23 +135,24 @@ jobs:
             tar --no-same-owner --no-same-permissions -xJf /input/qemu.tar.xz -C /tmp/qemu-tool
             export PATH="/tmp/qemu-tool/qemu/bin:$PATH"
             qemu-system-riscv32 --version
-            cd tests/admission_target_probe
+            cd tests/http_lifecycle_target_probe
             idf.py set-target esp32c3
             idf.py build
-            test -s build/admission_target_probe.elf
-            test -s build/admission_target_probe.bin
+            test -s build/http_lifecycle_probe.elf
+            test -s build/http_lifecycle_probe.bin
             idf.py size
-            sha256sum build/admission_target_probe.bin
-            echo TARGET_ADMISSION_BUILD_OK
+            sha256sum build/http_lifecycle_probe.bin
+            echo TARGET_HTTP_LIFECYCLE_BUILD_OK
             rc=0
             timeout --kill-after=5s 60s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
             tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
             cat /tmp/qemu-clean.log
             test "$rc" = 0 || test "$rc" = 124
-            test "$(grep -cx ADMISSION_PROBE_PASS /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "ADMISSION_PROBE_CASE window=1 app_first=0 late=0 handoff=1" /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "ADMISSION_PROBE_CASE window=2 app_first=1 late=0 handoff=1" /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "ADMISSION_PROBE_CASE window=3 app_first=1 late=1 handoff=0" /tmp/qemu-clean.log)" = 1
-            if grep -E "ADMISSION_PROBE_FAIL|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
-            echo TARGET_ADMISSION_QEMU_OK
+            test "$(grep -cx HTTP_WORKER_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_WORKER_CASE 1 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_WORKER_CASE 2 result=2" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_WORKER_CASE 3 result=2" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx HTTP_STARTUP_PASS /tmp/qemu-clean.log)" = 1
+            if grep -E "HTTP_WORKER_FAIL|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
+            echo TARGET_HTTP_LIFECYCLE_QEMU_OK
           '
