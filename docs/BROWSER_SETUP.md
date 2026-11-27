@@ -30,3 +30,7 @@ docs/setup-preview.html is inert, standalone, Russian, responsive HTML/CSS. No J
 - Espressif unified provisioning: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/provisioning/provisioning.html
 
 The documentation is a reference for the architecture, not proof of compatibility with the pinned SDK or actual browser.
+
+## Offline presentation model (2026-11-27)
+
+The isolated `tests/browser_setup/view_model.mjs` models the browser's display and button availability after a trusted adapter signals authentication. It decodes only already authenticated application replies, never raw HTTP or ciphertext; the adapter and device independently enforce authorization. It accepts one outstanding local request, tracks the exact trial as a hex string (no floating-point rounding), requires explicit save confirmation and a recent verified status, and never automatically retries a save with unknown outcome. It has no actual transport or credentials. Run `node tests/browser_setup/test_view_model.mjs` with a local Node runtime; mobile browser behavior is not established. Do not wire the model to live credentials until the trust and Security 2 interoperability gates are satisfied.

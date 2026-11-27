@@ -1,3 +1,11 @@
+# 2026-11-27 — Offline browser presentation state model
+
+- Added isolated ES module and tests under tests/browser_setup (not included in firmware or served by preview). No network, DOM, credential collection, cryptography, dependencies, storage, workflows, or startup changes. Based on exact src/room_setup_dispatch.h and room_setup_request.h contracts and existing docs/BROWSER_SETUP.md. The view is NOT an authentication or authorization implementation.
+- Actual V8 execution before publication: 114 assertions PASS, including full reply code/phase/token-presence matrix, exact 64-bit token handling, one outstanding request, matching local reply ticket, matching trial, explicit save confirmation, fresh verified status, terminal receipts, ambiguous/lost/late save without retry, cancellation, expiry and monotonic time. Test source generated from the same executed function definitions. Browser/Node and SDK interoperability not yet run.
+- Independent trust anchor, actual Security 2 browser client, AP-only SDK worker with bounded shutdown, real DHCP freshness and protected storage, runtime heap, hardware and target compilation remain open. No actual password entry or live endpoint. No flash/OTA/protected merge. Next: run standalone Node tests on published files, then review secure browser client and implement isolated bounded backend worker model; do not enable real input or listener until all trust and lifecycle gates pass. Revert this commit to remove isolated model if needed.
+
+---
+
 # 2026-11-27 — Approved 2 MiB layout adopted in experimental candidate
 
 - User approved candidate adoption only. Base cd786d0de71d3824c8d84ea1fedda42d925d6a56 differs from the previously tested source 75df361f733973bd7d58e7bd856af96da28bdbb6 only in three journals (GitHub compare). Apply exact CSV transformation from successful PR #28 / run 45912021281: move factory to 0x120000 / 2 MiB, sort after room_wifi; no CMake, sdkconfig, runtime or workflow edits. Local arithmetic/structural checks passed: row order, all data entries identical, app alignment and size, nonoverlap and 4 MiB bounds, original factory range excluded.
