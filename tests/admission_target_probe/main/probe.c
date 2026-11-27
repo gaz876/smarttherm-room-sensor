@@ -48,7 +48,7 @@ static void wait_worker_return(unsigned pending) {
     uint64_t end=now_ms()+2000u;
     while(atomic_load_explicit(&worker.phase,memory_order_acquire)==pending){CHECK(now_ms()<end);vTaskDelay(1);}
 }
-static room_sdk_stop_result poll(fixture *f) {
+static room_sdk_stop_result admission_probe_poll(fixture *f) {
     return room_sdk_stop_poll(&worker,f->window,room_admission_drained(&f->gate,f->window));
 }
 static void scenario(fixture *f,uint64_t window,bool app_first,bool late) {
@@ -62,17 +62,17 @@ static void scenario(fixture *f,uint64_t window,bool app_first,bool late) {
     room_lease denied={0};CHECK(!room_admission_enter(&f->gate,window,&denied));
     CHECK(!room_admission_drained(&f->gate,window));
     CHECK(room_sdk_stop_request(&worker,window,deadline,f,synthetic_stop));take(f->stop_entered);
-    CHECK(poll(f)==ROOM_SDK_WAIT);CHECK(!room_sdk_stop_request(&worker,window,deadline,f,synthetic_stop));
+    CHECK(admission_probe_poll(f)==ROOM_SDK_WAIT);CHECK(!room_sdk_stop_request(&worker,window,deadline,f,synthetic_stop));
     unsigned pending=atomic_load_explicit(&worker.phase,memory_order_acquire);
-    if(!app_first){release_stop(f);wait_worker_return(pending);CHECK(poll(f)==ROOM_SDK_WAIT);}
-    release_app(f);CHECK(!room_admission_drained(&f->gate,window));CHECK(poll(f)==ROOM_SDK_WAIT);
-    if(app_first){release_app(f);CHECK(room_admission_drained(&f->gate,window));CHECK(poll(f)==ROOM_SDK_WAIT);}
-    if(late){while(now_ms()<deadline)vTaskDelay(1);CHECK(poll(f)==ROOM_SDK_LOCKED);}
+    if(!app_first){release_stop(f);wait_worker_return(pending);CHECK(admission_probe_poll(f)==ROOM_SDK_WAIT);}
+    release_app(f);CHECK(!room_admission_drained(&f->gate,window));CHECK(admission_probe_poll(f)==ROOM_SDK_WAIT);
+    if(app_first){release_app(f);CHECK(room_admission_drained(&f->gate,window));CHECK(admission_probe_poll(f)==ROOM_SDK_WAIT);}
+    if(late){while(now_ms()<deadline)vTaskDelay(1);CHECK(admission_probe_poll(f)==ROOM_SDK_LOCKED);}
     if(app_first){release_stop(f);wait_worker_return(pending);}else release_app(f);
     CHECK(room_admission_drained(&f->gate,window));
     for(size_t i=0;i<sizeof(f->buffer);++i)CHECK(f->buffer[i]==0);
-    room_sdk_stop_result result=poll(f);uint64_t end=now_ms()+2000u;
-    while(result==ROOM_SDK_WAIT){CHECK(now_ms()<end);vTaskDelay(1);result=poll(f);}
+    room_sdk_stop_result result=admission_probe_poll(f);uint64_t end=now_ms()+2000u;
+    while(result==ROOM_SDK_WAIT){CHECK(now_ms()<end);vTaskDelay(1);result=admission_probe_poll(f);}
     CHECK(result==(late?ROOM_SDK_LOCKED:ROOM_SDK_DRAINED));
     CHECK(!room_admission_enter(&f->gate,window,&denied));
     CHECK(worker.quarantined==late);
