@@ -1,3 +1,10 @@
+# 2026-11-27 — Affected channel regression and target build started
+
+- PR #34 is an isolated CI-only draft; workflow head 3bb56040a045b2e6bfb59299b23b158ed3bbfa39, blob 402faddc9003bc90a6e88571f3166b2787aaadc4 matches locally checked YAML. Outer and inner Bash syntax pass (initial inner extraction error corrected before publication). Source fixed at abe59e3c0e7f8e2c7099baf1ed34d8198dcdaa9e, ten explicit Git blob checks, four related offline C host regressions then exact ESP32-C3 build. Same-repo branch/path restriction, standard public ubuntu-24.04, permissions {}, 20-minute cap, pinned SDK image previously verified, no network in build container, no artifacts, secrets or private inputs. Existing main workflow triggers checked, no overlap. Full administrative and historical/dependency audit limits remain.
+- Run 45947440581 / job 140335266736 observed in_progress, setup step successful; no new host-regression or target PASS claimed yet. Inspect full logs and exact source checks after terminal status; close test PR without merge when reviewed. No repeat of unchanged prior QEMU probes. No production activation, deployment, OTA, physical tests or protected merge.
+
+---
+
 # 2026-11-27 — Offline phone-channel close retry correction
 
 - Actual channel code audit identified a defensive cleanup issue: after backend close returns true, a later retry can call the already closed backend again if owner-side cleanup has not finished. Candidate latches successful backend drain for the window, does not release a pending response during dispatch, retains owner/window checks, and does not report failed sends as success. This is a synthetic fault-path finding, not an observed physical SDK failure; no network backend or activation added.
