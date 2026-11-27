@@ -1,3 +1,11 @@
+# 2026-11-27 — Offline 2 MiB partition experiment PASS
+
+- PR #28 head 3c6b04341752471b3d27a5468264d8e3ff5957e9, workflow blob 9535132ee46b53d95af3487f37a2341ea0cab4f9, run 45912021281 / job 140222386233 completed success, all three steps. Full log 240058 characters / 1842 lines; actual 1029/1029 build, BUILD_EXIT=0; SDK 6.1.1, GCC 15.2.0, source 75df361f733973bd7d58e7bd856af96da28bdbb6. Log lists 48 source blobs; four critical build/config inputs independently matched; full per-blob recheck hit connector call limit. Zero warning/error markers or common credential signatures detected in log; not full security clearance. Token Metadata read only; no artifacts.
+- CSV_ORDER_OK, DATA_PARTITIONS_UNCHANGED, PARTITION_GENERATOR_OK, APP_OFFSET_OK=0x120000, GENERATED_TABLE_MATCH_OK, HTTPS_PARTITION_2M_BUILD_OK, PARTITION_EXPERIMENT_OK. Generated table SHA256 b7e7cc4ebfcb5ce7d928eb74f9aa45866890d09399e7b9c44f3b0fa38cb37246 equals independently generated table; old table ea697e36954d8d3fe4b112e9693ab32764e90bf81507434711b83eff4f19c20f. All eight forced HTTPS symbols and Security2 checked by workflow. App 1053392 bytes (+119168); headroom 1043760 of 2097152; static DRAM 112930/321296, remaining static 208366, not runtime heap.
+- Offline layout qualifies for continued design only. No actual partition/config changes, runtime listener, device flash, OTA, deployment or main merge; physical 4 MiB capacity, power-loss/rollback and TLS runtime heap remain unverified. Do not rerun this experiment without new reason. Preserve old partition and app; next: separately approved candidate partition adoption if needed, trusted browser backend design (certificate trust, exclusive AP/STA ownership, bounded shutdown, DHCP freshness and Security2 interoperability), then mock and target tests; no hardware activation. Existing protected branch and 5.5.6 baseline retained.
+
+---
+
 # 2026-11-27 — Partition CSV ordering correction
 
 - PR #28 initial run 45910641021, job 140217880963, workflow b66009136bb4481e69438fa11179eda85e996b41 failed before compilation: SDK CSV generator reported line 6 overlap because relocated factory row preceded the lower-offset room_wifi row. Addresses themselves do not intersect. No firmware was compiled or flashed by that attempt.
