@@ -1,3 +1,11 @@
+# 2026-11-27 — Independent Node test of published browser model
+
+- Source commit 68f2d938aeab117ba5ce0fa59df648069557518b. Direct raw GitHub download failed (sandbox DNS); fetched exact files through GitHub connector, reconstructed local copies and verified git hash-object against both published blobs: model af0d7cfae55ca939b320f0d96774dac8a6508440, test 162464cf43c78b72afd4d5d374566c6e056a6afa. SHA256 model 388502b5ef3bcda41509b22faeffa096ecebc06fdc1340d46a05de67d911403d, test c78f015239bbebf65d567e7075214797e5721202509c18f47fdb9e5f0f0589b4.
+- Local Node.js v22.16.0: node --check on both modules exit 0; node test_view_model.mjs exit 0, 114 assertions PASS. Prior direct V8 run also 114 assertions PASS. No external packages, network requests, credential collection, CI, or firmware changes. Actual mobile browser, HTTPS and SDK end-to-end interoperability not tested.
+- Next: isolated bounded server worker contract and browser trust/Security2 interoperability review, then integrated tests and target build with committed partition; preserve fail-closed behavior and no live credential entry or device writes before hardware gates.
+
+---
+
 # 2026-11-27 — Offline browser presentation state model
 
 - Added isolated ES module and tests under tests/browser_setup (not included in firmware or served by preview). No network, DOM, credential collection, cryptography, dependencies, storage, workflows, or startup changes. Based on exact src/room_setup_dispatch.h and room_setup_request.h contracts and existing docs/BROWSER_SETUP.md. The view is NOT an authentication or authorization implementation.
