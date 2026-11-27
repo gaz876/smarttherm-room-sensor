@@ -1,4 +1,4 @@
-name: ESP32-C3 HTTP mailbox loopback qualification
+name: ESP32-C3 HTTP mailbox owner deadline qualification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -15,13 +15,13 @@ jobs:
     timeout-minutes: 25
     permissions: {}
     steps:
-      - name: Build and run isolated HTTP mailbox loopback probe
+      - name: Build and run isolated HTTP mailbox owner deadline probe
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=dfda6adf8696d0b62856960be2e138b233199a49
+          source_sha=306f8263fe06629886c1aee9be4694c5cddb8109
           image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
@@ -38,19 +38,20 @@ jobs:
           739079da75a937ed1c18b7edbe831c0254249780 tests/http_mailbox_sdk_probe/CMakeLists.txt
           3b982527dccd6279d73dcb90c7ae47970739e4ed tests/http_mailbox_sdk_probe/main/CMakeLists.txt
           56c38a500be28c289abcda273ab4ac0ca78a9d81 tests/http_mailbox_sdk_probe/sdkconfig.defaults
-          f4f3fccd83c6d615970c16f32d767e819b4c4953 tests/http_mailbox_sdk_probe/main/probe.c
-          bbb110d76bffede4942330ce7d59a99eca8af42d tests/browser_worker/worker_model.h
+          72cb3684ff3d5ef784e6c5fb317f72c0eda1f281 tests/http_mailbox_sdk_probe/main/probe.c
+          a5319c72fcd169b484ffd47f2f3fb53333ac62c6 tests/browser_worker/worker_model.h
           c73f0dd25a66edd063f30d314a40b590acebe859 tests/browser_worker/mailbox.h
-          47104a703fbae97821b0d163de594dc2a0eb8113 tests/browser_worker/completion_adapter.h
+          a5c468c6fe7ed7988c3ac7ce9e58983af7df9d23 tests/browser_worker/completion_adapter.h
+          b9e660cd33b41b810b119933f3ebfde551a343ae tests/browser_worker/timed_completion_adapter.h
           MANIFEST
-          test "$(wc -l < "$work/manifest")" = 12
+          test "$(wc -l < "$work/manifest")" = 13
           while read -r expected path; do
             test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
             mkdir -p "$work/input/$(dirname "$path")"
             git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
             test "$(git hash-object "$work/input/$path")" = "$expected"
           done < "$work/manifest"
-          echo TARGET_INPUT_BLOBS_OK=12
+          echo TARGET_INPUT_BLOBS_OK=13
           echo SOURCE_SHA="$source_sha"
           curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
           test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
@@ -80,17 +81,17 @@ jobs:
             test -s build/http_mailbox_sdk_probe.bin
             idf.py size
             sha256sum build/http_mailbox_sdk_probe.bin
-            echo TARGET_HTTP_MB_BUILD_OK
+            echo TARGET_HTTP_MB_BUDGET_BUILD_OK
             rc=0
             timeout --kill-after=5s 60s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
             tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
             cat /tmp/qemu-clean.log
             test "$rc" = 0 || test "$rc" = 124
-            test "$(grep -cx HTTP_MB_PASS /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "HTTP_MB_CASE 1 status=200 ack=1 result=1" /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "HTTP_MB_CASE 2 status=503 ack=1 result=1" /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "HTTP_MB_CASE 3 status=200 ack=0 result=1" /tmp/qemu-clean.log)" = 1
-            test "$(grep -cx "HTTP_MB_CASE 4 status=200 ack=0 result=2" /tmp/qemu-clean.log)" = 1
-            if grep -E "HTTP_MB_FAIL|Failed to post esp_http_server event|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
-            echo TARGET_HTTP_MB_QEMU_OK
+            test "$(grep -cx HTTP_MB_BUDGET_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_BUDGET_CASE 1 status=200 ack=1 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_BUDGET_CASE 2 status=503 ack=1 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_BUDGET_CASE 3 status=200 ack=0 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_BUDGET_CASE 4 status=200 ack=0 result=2" /tmp/qemu-clean.log)" = 1
+            if grep -E "HTTP_MB_BUDGET_FAIL|Failed to post esp_http_server event|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
+            echo TARGET_HTTP_MB_BUDGET_QEMU_OK
           '
