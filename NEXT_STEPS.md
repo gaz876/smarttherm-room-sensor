@@ -1,3 +1,10 @@
+# 2026-11-27 — CI feature macro correction; retry started
+
+- PR #34 run 45947440581 / job 140335266736 completed failure. Full log 249 lines, ten exact inputs verified, pinned SDK ESP-IDF 6.1.1 and cross GCC 15.2.0 confirmed. Host GCC 13.3.0: test_channel_ack passed 1823 checks; compiling test_channel_threads failed because forced mock include brought in glibc _POSIX_C_SOURCE=199506L before test definition 200809L. Target build was not reached; no other host PASS claimed. This is a compile-command issue, not evidence of a runtime failure.
+- Fixed only CI compiler flag -D_POSIX_C_SOURCE=200809L, preserving -Werror and ASan/UBSan. Local GCC 14.2 and Clang 17 feature-macro probe compiled/ran, actual close-retry fixture again passed 29 checks on each after correcting missing local mock include path. YAML and outer/inner Bash syntax checked. Published workflow head 63acfa28634f8843eb09c8cf4ee98e00ce8351d0 / blob 4f764b2f2320662dd81b15f9c54af843732d5be3 matches local; one-line diff, exact source unchanged abe59e3c0e7f8e2c7099baf1ed34d8198dcdaa9e, security controls unchanged. Retry run 45947672649 in_progress at capture. No merge/deployment or device changes. Next inspect terminal result and all logs, no duplicate rerun while active. Retain failed run as evidence.
+
+---
+
 # 2026-11-27 — Affected channel regression and target build started
 
 - PR #34 is an isolated CI-only draft; workflow head 3bb56040a045b2e6bfb59299b23b158ed3bbfa39, blob 402faddc9003bc90a6e88571f3166b2787aaadc4 matches locally checked YAML. Outer and inner Bash syntax pass (initial inner extraction error corrected before publication). Source fixed at abe59e3c0e7f8e2c7099baf1ed34d8198dcdaa9e, ten explicit Git blob checks, four related offline C host regressions then exact ESP32-C3 build. Same-repo branch/path restriction, standard public ubuntu-24.04, permissions {}, 20-minute cap, pinned SDK image previously verified, no network in build container, no artifacts, secrets or private inputs. Existing main workflow triggers checked, no overlap. Full administrative and historical/dependency audit limits remain.
