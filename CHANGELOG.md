@@ -1,3 +1,12 @@
+# 2026-11-27 — ESP32-C3 clock and synchronization compatibility probe
+
+- Source review: ESP-IDF 6.1.1 commit 051e4c4eb20346e043cdd47bc388fde75ff8af63, esp_timer.h blob e48a213634d3e2cd6ba1dec657687a756d48c291, stdatomic.c 428a800eca518e00b17ead979b2c7acef5aa9633, esp_stdatomic.h a988075a6ffd3022b6be10e5c0d038467ec2b41c. SDK provides software atomic operations on single-core targets without native A extension using interrupt masking. esp_timer_get_time returns signed 64-bit microseconds; documented fast nonlocking reads, deep-sleep resets clock; discard session across restart. https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-reference/system/esp_timer.html
+- Local generic Clang 17 RV32IMC freestanding assembly-only probe exit 0, two atomic-alignment warnings, emitted __atomic_compare_exchange_1 and __atomic_store_1 calls, ATOMIC_BOOL_LOCK_FREE macro 1; not Espressif GCC, not linked or run. Local SDK/compiler/container runtime absent. No lock-free or target latency claim. Keep task-only ownership; no spin retry at elevated priority.
+- Isolated draft PR #29, ci/clock-sync-probe-20261127, commit ccf4f2ec264f7467ded1b5b44332f008fafc4b9b, workflow blob fc838f094208be373969811b0d7a779447ab1d72; run 45920972097 in_progress at capture, no result yet. Exact two public headers pinned by SHA, standalone empty app_main, offline capability-dropped image sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c, GCC 15.2.0, permissions {}, standard public runner, 12 min limit. Only workflow added on separate branch, no merge, no secrets referenced, no artifact upload or device writes. Administrative secret/settings visibility still limited; no claim full audit.
+- Next: inspect run status, all jobs, full logs and linked symbols before accepting compile/link compatibility; then test actual task scheduling/latency, synchronization and timer on hardware separately. No firmware change, real SDK worker or hardware activation. Do not duplicate run. Close test PR without merge after result review.
+
+---
+
 # 2026-11-27 — Offline mailbox clock ordering and race-detector test
 
 - Host-only mailbox now samples one trusted monotonic clock AFTER acquiring the atomic try-lock; event-supplied time is ignored in the clocked entry. Busy does not sample clock. Clock failure stops/faults the model and wipes its slot; backwards time still faults. Legacy explicit-time entry retained for offline regression. Shared real-time callers must use the same bounded non-reentrant clock; this remains a caller contract, not a live adapter.
