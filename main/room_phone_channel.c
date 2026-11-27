@@ -52,10 +52,14 @@ bool room_phone_channel_close(room_phone_channel *c) {
     if(!c->attempted)return !c->task&&!c->reply;
     if(!owner(c))return false;
     c->stopping=true;
-    if(!c->io.close(c->io.ctx))return false;
+    /* Successful close consumes backend ownership for this window. */
+    if(!c->backend_drained){
+        if(!c->io.close(c->io.ctx))return false;
+        c->backend_drained=true;
+    }
     /* Backend is quiescent now. Only now return the borrowed buffer; a
      * transport loss cannot undo a verified save. No stale generation use. */
-    if(c->window!=c->task->session.bridge.window)return false;
+    if(c->window!=c->task->session.bridge.window||c->task->session.transport.dispatching)return false;
     if(c->task->session.transport.pending)(void)room_apsta_task_sent(c->task,false);
     if(c->task->session.transport.pending||c->task->session.transport.dispatching)return false;
     enroll_wipe(c->packet,sizeof(c->packet));
