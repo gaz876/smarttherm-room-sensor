@@ -5,8 +5,8 @@
 #include <string.h>
 
 /* Host-only copied mailbox. Initialize once before sharing; never move it.
- * Trusted callers serialize timestamps at the lock boundary (same clock).
- * No callbacks, I/O, allocation or waiting inside the try-lock. BUSY means
+ * Clocked entry samples one trusted bounded monotonic clock under the lock.
+ * No other callbacks, I/O, allocation or waiting inside the try-lock. BUSY means
  * retry later, not success. External copies remain the caller's responsibility.
  * This is not an SDK worker or a proof of AP isolation/quiescence. */
 enum { MB_CAP=4096 };
@@ -40,12 +40,18 @@ static inline void mb_clear(mailbox *m) {
 }
 /* Input/output must be private caller buffers, disjoint from mailbox and reply.
  * No pointer retained. A copied response is NOT a send acknowledgement. */
-static inline mb_result mb_apply(mailbox *m,mb_event e,mb_reply *out) {
+typedef bool (*mb_clock)(void *,uint64_t *);
+static inline mb_result mb_apply_impl(mailbox *m,mb_event e,mb_reply *out,mb_clock clock,void *ctx) {
     if (!m || !out) return MB_REJECT;
     *out=(mb_reply){0};
     bool expected=false;
     if (!atomic_compare_exchange_strong_explicit(&m->held,&expected,true,memory_order_acquire,memory_order_relaxed)) return MB_BUSY;
     worker_model *w=&m->life;
+    if(clock && !clock(ctx,&e.now)) {
+        w->fault=true; worker_stop(w,w->last_time); mb_clear(m);
+        m->taken=false; m->handshake=false;
+        atomic_store_explicit(&m->held,false,memory_order_release); return MB_REJECT;
+    }
     worker_tick(w,e.now);
     bool ok=false;
     bool current=e.window && e.window==w->window;
@@ -82,5 +88,15 @@ static inline mb_result mb_apply(mailbox *m,mb_event e,mb_reply *out) {
     }
     atomic_store_explicit(&m->held,false,memory_order_release);
     return ok?MB_OK:MB_REJECT;
+}
+/* Explicit timestamps are only for serialized offline tests. */
+static inline mb_result mb_apply(mailbox *m,mb_event e,mb_reply *out) {
+    return mb_apply_impl(m,e,out,NULL,NULL);
+}
+/* All shared callers must use the same clock and this entry exclusively.
+ * Clock callback must be bounded, nonblocking and non-reentrant. */
+static inline mb_result mb_apply_clocked(mailbox *m,mb_event e,mb_reply *out,mb_clock clock,void *ctx) {
+    if(!clock) { if(out) *out=(mb_reply){0}; return MB_REJECT; }
+    return mb_apply_impl(m,e,out,clock,ctx);
 }
 #endif
