@@ -1,0 +1,177 @@
+name: ESP32-C3 offline SDK server shutdown probe
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/sdk-stop-probe.yml']
+permissions: {}
+concurrency:
+  group: sdk-stop-probe-20261127
+  cancel-in-progress: true
+jobs:
+  probe:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/sdk-stop-probe-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Run isolated SDK lifecycle in QEMU
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$work/input/main"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
+          test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
+          (cd "$work/input"; echo '547f03e04701a92cbb699f7f7d015adc1f5b5ef93cbb94c0dd9b7107e2d84e77  qemu.tar.xz' | sha256sum -c -)
+          cat > "$work/input/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+          project(sdk_stop_probe)
+          EOF
+          cat > "$work/input/main/CMakeLists.txt" <<'EOF'
+          idf_component_register(SRCS "probe.c" INCLUDE_DIRS "." REQUIRES esp_http_server esp_netif esp_event esp_timer freertos heap)
+          target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)
+          EOF
+          cat > "$work/input/sdkconfig.defaults" <<'EOF'
+          CONFIG_LWIP_NETIF_LOOPBACK=y
+          CONFIG_LWIP_IPV4=y
+          EOF
+          cat > "$work/input/main/probe.c" <<'EOF'
+          #include <stdbool.h>
+          #include <stdint.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <stdatomic.h>
+          #include <string.h>
+          #include "sdkconfig.h"
+          #include "esp_http_server.h"
+          #include "esp_netif.h"
+          #include "esp_event.h"
+          #include "esp_timer.h"
+          #include "esp_heap_caps.h"
+          #include "freertos/FreeRTOS.h"
+          #include "freertos/task.h"
+          #include "freertos/semphr.h"
+          #if !CONFIG_IDF_TARGET_ESP32C3 || !CONFIG_LWIP_NETIF_LOOPBACK
+          #error incorrect isolated target configuration
+          #endif
+          typedef struct {
+              httpd_handle_t server;
+              SemaphoreHandle_t entered, release;
+              uint8_t *buffer;
+              atomic_bool callback_done, stop_entered, stop_done;
+              atomic_uint freed;
+              esp_err_t stop_result;
+          } fixture;
+          static fixture cases[2];
+          static void require_at(bool ok,int line) {
+              if(!ok) { printf("SDK_STOP_FAIL line=%d\n",line); fflush(stdout); abort(); }
+          }
+          #define CHECK(x) require_at((x),__LINE__)
+          static void release_context(void *arg) {
+              fixture *f=arg;
+              CHECK(atomic_load(&f->callback_done));
+              CHECK(atomic_load(&f->freed)==0 && f->buffer);
+              for(size_t i=0;i<32;i++) CHECK(f->buffer[i]==0);
+              free(f->buffer); f->buffer=NULL;
+              atomic_fetch_add(&f->freed,1);
+          }
+          static void server_work(void *arg) {
+              fixture *f=arg;
+              memset(f->buffer,0x5a,32);
+              CHECK(xSemaphoreGive(f->entered)==pdTRUE);
+              CHECK(xSemaphoreTake(f->release,pdMS_TO_TICKS(15000))==pdTRUE);
+              volatile uint8_t *p=f->buffer;
+              for(size_t i=0;i<32;i++) p[i]=0;
+              atomic_store(&f->callback_done,true);
+          }
+          static void stopper(void *arg) {
+              fixture *f=arg;
+              atomic_store(&f->stop_entered,true);
+              f->stop_result=httpd_stop(f->server);
+              atomic_store(&f->stop_done,true);
+              vTaskDelete(NULL);
+          }
+          static void scenario(fixture *f,bool late) {
+              atomic_init(&f->callback_done,false); atomic_init(&f->stop_entered,false);
+              atomic_init(&f->stop_done,false); atomic_init(&f->freed,0u);
+              f->buffer=calloc(32,1); f->entered=xSemaphoreCreateBinary(); f->release=xSemaphoreCreateBinary();
+              CHECK(f->buffer && f->entered && f->release);
+              httpd_config_t cfg=HTTPD_DEFAULT_CONFIG();
+              /* No physical interface, no URI handlers, no Wi-Fi, no TLS or credentials.
+                 Listener exists only inside the NIC-less, offline emulator. */
+              cfg.server_port=0; cfg.global_user_ctx=f; cfg.global_user_ctx_free_fn=release_context;
+              CHECK(httpd_start(&f->server,&cfg)==ESP_OK);
+              CHECK(httpd_queue_work(f->server,server_work,f)==ESP_OK);
+              CHECK(xSemaphoreTake(f->entered,pdMS_TO_TICKS(3000))==pdTRUE);
+              CHECK(uxTaskPriorityGet(NULL)<4);
+              CHECK(xTaskCreate(stopper,"stop_probe",4096,f,4,NULL)==pdPASS);
+              int64_t begin=esp_timer_get_time(); CHECK(begin>=0);
+              unsigned polls=0; bool quarantined=false;
+              while(esp_timer_get_time()-begin<(late?5200000:200000)) {
+                  CHECK(atomic_load(&f->stop_entered));
+                  CHECK(!atomic_load(&f->stop_done) && !atomic_load(&f->callback_done));
+                  CHECK(atomic_load(&f->freed)==0);
+                  if(esp_timer_get_time()-begin>=5000000) quarantined=true;
+                  polls++; vTaskDelay(pdMS_TO_TICKS(50));
+              }
+              CHECK(polls>1 && quarantined==late);
+              CHECK(xSemaphoreGive(f->release)==pdTRUE);
+              int64_t wait=esp_timer_get_time();
+              while(!atomic_load(&f->stop_done)) {
+                  CHECK(esp_timer_get_time()-wait<5000000);
+                  vTaskDelay(pdMS_TO_TICKS(20));
+              }
+              CHECK(f->stop_result==ESP_OK && atomic_load(&f->callback_done));
+              CHECK(atomic_load(&f->freed)==1 && !f->buffer);
+              /* A late SDK success cannot undo the fixture's latched quarantine. */
+              bool handoff_allowed=!quarantined && atomic_load(&f->stop_done) && atomic_load(&f->freed)==1;
+              CHECK(handoff_allowed!=late);
+              vSemaphoreDelete(f->entered); vSemaphoreDelete(f->release);
+              vTaskDelay(pdMS_TO_TICKS(200)); CHECK(heap_caps_check_integrity_all(true));
+              printf("SDK_STOP_CASE late=%u polls=%u freed=1 handoff=%u\n",(unsigned)late,polls,(unsigned)handoff_allowed);
+          }
+          void app_main(void) {
+              CHECK(esp_netif_init()==ESP_OK);
+              CHECK(esp_event_loop_create_default()==ESP_OK);
+              scenario(&cases[0],false); scenario(&cases[1],true);
+              puts("SDK_STOP_RUNTIME_PASS"); fflush(stdout);
+          }
+          EOF
+          sha256sum "$work/input/main/"* "$work/input/sdkconfig.defaults"
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/qemu-tool /tmp/probe
+            tar --no-same-owner --no-same-permissions -xJf /input/qemu.tar.xz -C /tmp/qemu-tool
+            export PATH="/tmp/qemu-tool/qemu/bin:$PATH"
+            qemu-system-riscv32 --version
+            cp -R --no-preserve=ownership /input/main /input/CMakeLists.txt /input/sdkconfig.defaults /tmp/probe/
+            cd /tmp/probe
+            idf.py set-target esp32c3
+            idf.py build
+            test -s build/sdk_stop_probe.elf
+            idf.py size
+            rc=0
+            timeout --kill-after=5s 60s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
+            tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
+            cat /tmp/qemu-clean.log
+            test "$rc" = 0 || test "$rc" = 124
+            test "$(grep -cx SDK_STOP_RUNTIME_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -Ec "^SDK_STOP_CASE late=0 polls=[0-9]+ freed=1 handoff=1$" /tmp/qemu-clean.log)" = 1
+            test "$(grep -Ec "^SDK_STOP_CASE late=1 polls=[0-9]+ freed=1 handoff=0$" /tmp/qemu-clean.log)" = 1
+            if grep -E "SDK_STOP_FAIL|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
+            echo QEMU_SDK_STOP_OK
+          '
