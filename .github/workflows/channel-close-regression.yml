@@ -53,7 +53,7 @@ jobs:
             cd /tmp/room_sensor
             gcc --version
             for test_name in test_channel_ack test_channel_threads test_channel_stop test_channel_close_retry; do
-              gcc -std=c11 -Wall -Wextra -Werror -pedantic -g -O1 -pthread -fsanitize=address,undefined -fno-sanitize-recover=all -fno-pie -no-pie -include tests/browser_worker/mock_channel/room_apsta_task.h -Isrc -Itests/browser_worker main/room_phone_channel.c "tests/browser_worker/$test_name.c" -o "/tmp/$test_name"
+              gcc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g -O1 -pthread -fsanitize=address,undefined -fno-sanitize-recover=all -fno-pie -no-pie -include tests/browser_worker/mock_channel/room_apsta_task.h -Isrc -Itests/browser_worker main/room_phone_channel.c "tests/browser_worker/$test_name.c" -o "/tmp/$test_name"
               timeout 30 "/tmp/$test_name"
               echo "HOST_TEST_OK=$test_name"
             done
