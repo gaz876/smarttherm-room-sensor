@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=a6937ed7c48caa23e8286d454f56a7948c96ad65
+          source_sha=85ca64d1986a716997603ed0ff53095823b5d1c9
           image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
@@ -38,7 +38,7 @@ jobs:
           b9a19e73ff99b4e339904774e29079c85f4f12e9 tests/http_async_sdk_probe/CMakeLists.txt
           01b6843c739196e4f010bf66484b1241b59fd8ec tests/http_async_sdk_probe/main/CMakeLists.txt
           56c38a500be28c289abcda273ab4ac0ca78a9d81 tests/http_async_sdk_probe/sdkconfig.defaults
-          956b6650cfea16b450f8c2860272d003511320ab tests/http_async_sdk_probe/main/probe.c
+          2acfca983f8fb800a20993f7f5f0beb25ca61665 tests/http_async_sdk_probe/main/probe.c
           MANIFEST
           test "$(wc -l < "$work/manifest")" = 9
           while read -r expected path; do
