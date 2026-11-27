@@ -1,3 +1,9 @@
+# 2026-11-27 — Offline completion adapter runtime PASS
+
+- Verified PR #32 source 8cd45dfb1e632e3709a2c51856cc31bcba44bfeb, workflow head 61ad6c2ce663ca21e0501fd512875b59981ea60a, run 45932541494 / job 140288229299: all three steps, 1018/1018 build steps, 88 checks plus 128 FreeRTOS exchanges and one expiry in ESP32-C3 QEMU. Full log 1860 lines; four input blobs matched, heap integrity passed, free heap returned to 318356 bytes, stack remaining 3248/3320. No artifacts. PR closed without merge; no rerun. Offline model only, not real network or firmware validation.
+
+---
+
 # 2026-11-27 — Pinned offline completion adapter runtime test under ESP32-C3 FreeRTOS/QEMU started
 
 - Prior independent QEMU resource PASS checkpoint 8cd45dfb1e632e3709a2c51856cc31bcba44bfeb preserved. Local tool discovery: GCC and Clang available, no idf.py, qemu-system-riscv32 or Docker in PATH. New target execution uses four exact public blobs from the existing checkpoint: completion_adapter.h 47104a703fbae97821b0d163de594dc2a0eb8113, mailbox.h c73f0dd25a66edd063f30d314a40b590acebe859, worker_model.h bbb110d76bffede4942330ce7d59a99eca8af42d, test_ack_adapter.c 10ec3812a774cbafb9c761adf8edf44a51a98607. No changes to those components.
