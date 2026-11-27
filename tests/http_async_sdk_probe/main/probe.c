@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "esp_netif.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
