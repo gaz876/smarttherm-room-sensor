@@ -13,13 +13,13 @@
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "room_http_async.h"
-#include "completion_adapter.h"
+#include "timed_completion_adapter.h"
 
 /* Isolated QEMU probe. One synthetic request at a time, trusted local IDs.
  * No Wi-Fi driver, external interface, credentials or configuration writes.
- * Independent legacy mailbox stop budget is not an owner deadline proof;
- * recovery always additionally requires successful actual HTTP SDK stop. */
-#define CHECK(x) do { if(!(x)){printf("HTTP_MB_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
+ * One owner cleanup deadline covers mailbox and actual HTTP SDK stop;
+ * only the observed SDK stop result authorizes mailbox reuse. */
+#define CHECK(x) do { if(!(x)){printf("HTTP_MB_BUDGET_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
 typedef enum { NORMAL, APP_ERROR, CLOSE_PENDING, LATE } mode;
 typedef struct {
     room_http_lifecycle life;
@@ -88,7 +88,7 @@ static void client(void *ctx){
     give(f->client_read);take(f->allow_client_close);CHECK(close(fd)==0);give(f->client_done);vTaskDelete(NULL);
 }
 static void scenario(fixture *f,unsigned w,mode m){
-    f->window=w;f->port=(uint16_t)(18080u+2u*w);f->test=m;ack_init(&f->box);
+    f->window=w;f->port=(uint16_t)(18080u+2u*w);f->test=m;ack_init_owner_budget(&f->box);
     f->submitted=xSemaphoreCreateBinary();f->published=xSemaphoreCreateBinary();f->sent=xSemaphoreCreateBinary();
     f->allow_complete=xSemaphoreCreateBinary();f->completed=xSemaphoreCreateBinary();f->allow_ack=xSemaphoreCreateBinary();
     f->responder_done=xSemaphoreCreateBinary();f->client_read=xSemaphoreCreateBinary();
@@ -114,10 +114,17 @@ static void scenario(fixture *f,unsigned w,mode m){
     wipe(reply,sizeof reply);give(f->published);take(f->sent);take(f->client_read);
     CHECK(poll_receipt(f,&out)==ACK_WAIT&&out.ticket==0);
     uint8_t extra=1;CHECK(event(f,(mb_event){.action=MB_SUBMIT,.input=&extra,.size=1},false,&out)==ACK_REJECT);
-    uint64_t deadline=now()+(m==LATE?300u:1500u);bool closing=m==CLOSE_PENDING||m==LATE;
-    if(closing){CHECK(simple(f,MB_STOP,false,false)==ACK_OK);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
-        CHECK(!room_admission_drained(&f->life.gate,w));CHECK(simple(f,MB_DRAINED,false,false)==ACK_REJECT);
+    uint64_t deadline=now()+(m==LATE?300u:(m==CLOSE_PENDING?4500u:1500u));bool closing=m==CLOSE_PENDING||m==LATE;
+    if(closing){CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+        CHECK(f->box.box.life.stop_deadline==deadline);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
+        CHECK(!room_admission_drained(&f->life.gate,w));CHECK(simple(f,MB_DRAINED,true,true)==ACK_REJECT);
         if(m==LATE){while(now()<deadline)vTaskDelay(1);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_LOCKED);}}
+    if(m==CLOSE_PENDING){
+        while(now()+2200u<deadline)vTaskDelay(1);
+        CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+        CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
+        CHECK(f->box.box.life.stop_deadline==deadline);
+    }
     give(f->allow_complete);take(f->completed);
     CHECK(poll_receipt(f,&out)==(closing?ACK_REJECT:ACK_WAIT));
     if(m==CLOSE_PENDING)CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
@@ -125,17 +132,18 @@ static void scenario(fixture *f,unsigned w,mode m){
     if(!closing){CHECK(poll_receipt(f,&out)==ACK_OK&&out.ticket==f->ticket);CHECK(poll_receipt(f,&out)==ACK_REJECT);}
     else CHECK(poll_receipt(f,&out)==ACK_REJECT);
     give(f->allow_client_close);take(f->client_done);
-    CHECK(simple(f,MB_STOP,false,false)==ACK_OK);CHECK(room_admission_leave(&owner_lease));
+    if(!closing)CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+    CHECK(room_admission_leave(&owner_lease));
     room_sdk_stop_result rc=room_http_close(&f->life,w,deadline);
     while(rc==ROOM_SDK_WAIT){CHECK(now()<deadline);vTaskDelay(1);rc=room_http_close(&f->life,w,deadline);}
     bool locked=m==LATE;CHECK(rc==(locked?ROOM_SDK_LOCKED:ROOM_SDK_DRAINED));CHECK(worker.quarantined==locked);
-    CHECK(simple(f,MB_DRAINED,!locked,!locked)==(locked?ACK_REJECT:ACK_OK));
+    CHECK(ack_close_until(&f->box,w,deadline,!locked,!locked,read_clock,NULL)==(locked?ACK_REJECT:ACK_OK));
     CHECK(ack_step(&f->box,(mb_event){.action=MB_OPEN,.window=w+100},false,&out,read_clock,NULL)==(locked?ACK_REJECT:ACK_OK));
     if(locked)CHECK(!room_http_prepare(&forbidden,&worker,w+1));
-    printf("HTTP_MB_CASE %u status=%u ack=%u result=%d\n",w,m==APP_ERROR?503u:200u,closing?0u:1u,(int)rc);fflush(stdout);
+    printf("HTTP_MB_BUDGET_CASE %u status=%u ack=%u result=%d\n",w,m==APP_ERROR?503u:200u,closing?0u:1u,(int)rc);fflush(stdout);
 }
 void app_main(void){
     CHECK(esp_netif_init()==ESP_OK);CHECK(esp_event_loop_create_default()==ESP_OK);CHECK(room_sdk_stop_bind(&worker));
     for(unsigned i=0;i<4;i++)scenario(&cases[i],i+1,(mode)i);
-    puts("HTTP_MB_PASS");fflush(stdout);
+    puts("HTTP_MB_BUDGET_PASS");fflush(stdout);
 }
