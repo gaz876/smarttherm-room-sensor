@@ -1,0 +1,94 @@
+name: ESP32-C3 offline completion model compile-link probe
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/ack-adapter-probe.yml']
+permissions: {}
+concurrency:
+  group: ack-adapter-probe-20261127
+  cancel-in-progress: true
+jobs:
+  probe:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/ack-adapter-probe-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Compile and link isolated synthetic probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          source_sha=e38a62bb146f56c90094bf939fe16f1eede7c14d
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          git init -q "$work/repo"
+          git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
+          test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
+          mkdir -p "$work/input/main"
+          for name in completion_adapter.h mailbox.h worker_model.h; do
+            git -C "$work/repo" show "$source_sha:tests/browser_worker/$name" > "$work/input/main/$name"
+          done
+          test "$(git hash-object "$work/input/main/mailbox.h")" = c73f0dd25a66edd063f30d314a40b590acebe859
+          test "$(git hash-object "$work/input/main/worker_model.h")" = bbb110d76bffede4942330ce7d59a99eca8af42d
+          test "$(git hash-object "$work/input/main/completion_adapter.h")" = 47104a703fbae97821b0d163de594dc2a0eb8113
+          cat > "$work/input/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+          project(ack_adapter_probe)
+          EOF
+          cat > "$work/input/main/CMakeLists.txt" <<'EOF'
+          idf_component_register(SRCS "probe.c" INCLUDE_DIRS "." REQUIRES esp_timer)
+          target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)
+          target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,room_ack_probe_probe" "-Wl,-u,room_ack_probe_init" "-Wl,-u,room_ack_probe_clock" "-Wl,-u,room_ack_probe_atomic_capability")
+          EOF
+          cat > "$work/input/main/probe.c" <<'EOF'
+          #include "completion_adapter.h"
+          #include "esp_timer.h"
+          #include "sdkconfig.h"
+          #if !CONFIG_IDF_TARGET_ESP32C3
+          #error incorrect target
+          #endif
+          _Static_assert(sizeof(uint64_t)==8, "64-bit time required");
+          bool room_ack_probe_clock(void *ctx, uint64_t *ms) {
+              (void)ctx;
+              int64_t us=esp_timer_get_time();
+              if (!ms || us<0) return false;
+              *ms=(uint64_t)us/1000u;
+              return true;
+          }
+          void room_ack_probe_init(ack_adapter *m) { ack_init(m); }
+          ack_result room_ack_probe_probe(ack_adapter *m, mb_event event, bool receipt, mb_reply *reply) {
+              return ack_step(m,event,receipt,reply,room_ack_probe_clock,NULL);
+          }
+          int room_ack_probe_atomic_capability(void) { return ATOMIC_BOOL_LOCK_FREE; }
+          void app_main(void) {}
+          EOF
+          sha256sum "$work/input/main/"*
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/probe
+            cp -R --no-preserve=ownership /input/. /tmp/probe/
+            cd /tmp/probe
+            idf.py set-target esp32c3
+            idf.py build
+            test -s build/ack_adapter_probe.elf
+            riscv32-esp-elf-nm build/ack_adapter_probe.elf > /tmp/symbols.txt
+            for sym in room_ack_probe_probe room_ack_probe_init room_ack_probe_clock room_ack_probe_atomic_capability esp_timer_get_time; do
+              grep -E "[[:space:]]$sym$" /tmp/symbols.txt
+            done
+            riscv32-esp-elf-objdump -d --disassemble=room_ack_probe_probe build/ack_adapter_probe.elf
+            riscv32-esp-elf-objdump -d --disassemble=room_ack_probe_atomic_capability build/ack_adapter_probe.elf
+            echo ACK_ADAPTER_COMPILE_LINK_OK
+          '
