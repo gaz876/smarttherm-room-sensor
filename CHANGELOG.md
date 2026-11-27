@@ -1,3 +1,11 @@
+# 2026-11-27 — Offline completion contract integration regression
+
+- Reviewed existing copied mailbox and owner channel contracts: taking a copied reply is not sending it; a second TAKE_REPLY is rejected both before and after successful send completion, so this observation cannot serve as an acknowledgement. The real adapter needs an explicit, correlated completion indication to the owner and must not report successful send on copy alone. Failure or expiry must not produce a successful receipt. External buffer drain and worker exit remain independent proofs.
+- Added standalone tests/browser_worker/test_completion.c, a serialized synthetic sender fixture only, no live transport or firmware integration. Actual local GCC 14.2.0 and Clang 17.0.0 strict C11, ASan/UBSan, -fno-sanitize-recover=all -fno-pie -no-pie, both exit 0 under 10 s timeout, 45 checks each. Exact local baseline blobs mailbox c73f0dd25a66edd063f30d314a40b590acebe859 and worker bbb110d76bffede4942330ce7d59a99eca8af42d matched GitHub. Tested new blob b8049ea6fac862deffe2466e71b7f5765d377594, SHA256 b95954e891d5d3075cb88236fa98a90ecf7bda772424ac982880973c2fe11b04. Covers early, repeated, mismatched, failed and late completion, stop and drain. Synthetic receipt is not a synchronized production implementation or proof of actual send.
+- Next: design explicit owner/worker completion result and lifetime contract, then integrate a bounded mock adapter and test scheduling; real worker shutdown, physical target timing and browser trust remain open. No network, firmware, dependencies, workflow, device or OTA changes. Revert isolated test commit if needed.
+
+---
+
 # 2026-11-27 — ESP32-C3 clock/synchronization compile-link PASS
 
 - PR #29, head ccf4f2ec264f7467ded1b5b44332f008fafc4b9b, workflow fc838f094208be373969811b0d7a779447ab1d72, run 45920972097 / job 140251360914: success, all three steps. Full log reviewed: 1017/1017, real ELF and binary, CLOCK_SYNC_COMPILE_LINK_OK; SDK 6.1.1, GCC 15.2.0, exact pinned mailbox and worker headers verified by successful workflow hash checks. ELF elf32-littleriscv includes room_sync_probe, room_sync_init, room_sync_clock, room_sync_atomic_capability and esp_timer_get_time. Probe binary 0x25360 bytes; standalone default layout, NOT the candidate partition or firmware size.
