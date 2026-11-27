@@ -1,3 +1,10 @@
+# 2026-11-27 — Runtime probe complete; actual integration next
+
+- PR #32 closed without merge after verified QEMU PASS (run 45932541494, job 140288229299, source 8cd45dfb1e632e3709a2c51856cc31bcba44bfeb, workflow head 61ad6c2ce663ca21e0501fd512875b59981ea60a). No duplicate standalone compile or runtime probe for this unchanged model. Prior pending entry is historical.
+- Inventory actual phone channel and AP/STA owner integration at current experimental HEAD, review missing SDK transport, explicit send completion, worker exit/drain and exclusive handoff. Verify actual integrated build and relevant regression only after reviewed changes; do not equate synthetic model with real network. Browser trust, credential storage, DHCP freshness, physical board checks, watchdog and full administrative/dependency audit remain release gates. No production activation, protected merge, flash or OTA.
+
+---
+
 # 2026-11-27 — Pinned offline completion adapter runtime test under ESP32-C3 FreeRTOS/QEMU started
 
 - Prior independent QEMU resource PASS checkpoint 8cd45dfb1e632e3709a2c51856cc31bcba44bfeb preserved. Local tool discovery: GCC and Clang available, no idf.py, qemu-system-riscv32 or Docker in PATH. New target execution uses four exact public blobs from the existing checkpoint: completion_adapter.h 47104a703fbae97821b0d163de594dc2a0eb8113, mailbox.h c73f0dd25a66edd063f30d314a40b590acebe859, worker_model.h bbb110d76bffede4942330ce7d59a99eca8af42d, test_ack_adapter.c 10ec3812a774cbafb9c761adf8edf44a51a98607. No changes to those components.
