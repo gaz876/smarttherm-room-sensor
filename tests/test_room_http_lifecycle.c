@@ -13,13 +13,23 @@ static TaskHandle_t task;
 TaskHandle_t xTaskGetCurrentTaskHandle(void){return task;}
 int64_t esp_timer_get_time(void){return (int64_t)ms*1000;}
 static esp_err_t stop_stub(httpd_handle_t h){(void)h;return ESP_OK;}
-bool room_sdk_stop_request(room_sdk_stop *s,uint64_t w,uint64_t d,httpd_handle_t h,room_sdk_stop_fn fn){
+bool room_sdk_stop_reserve(room_sdk_stop *s,const void *token,uint64_t w){
+    if(!s||s->owner!=task||s->quarantined||!token||s->reservation||!w||w<=s->window)return false;
+    s->reservation=token;s->reserved_window=w;return true;
+}
+bool room_sdk_stop_cancel_unstarted(room_sdk_stop *s,const void *token,uint64_t w){
+    if(s->owner!=task||s->quarantined||!token||s->reservation!=token||s->reserved_window!=w||w<=s->window)return false;
+    s->window=w;s->reservation=NULL;s->reserved_window=0;return true;
+}
+bool room_sdk_stop_request_for(room_sdk_stop *s,const void *token,uint64_t w,uint64_t d,httpd_handle_t h,room_sdk_stop_fn fn){
+    CHECK(s->reservation==token&&s->reserved_window==w);
     ++requests;CHECK(h==&handle_token&&fn==stop_stub&&d>ms&&w>s->window);
     if(reject)return false;
     s->window=w;return true;
 }
-room_sdk_stop_result room_sdk_stop_poll(room_sdk_stop *s,uint64_t w,bool drained){
-    ++polls;CHECK(w==s->window&&drained);return result;
+room_sdk_stop_result room_sdk_stop_poll_for(room_sdk_stop *s,const void *token,uint64_t w,bool drained){
+    ++polls;CHECK(s->reservation==token&&w==s->window&&drained);
+    if(result==ROOM_SDK_DRAINED){s->reservation=NULL;s->reserved_window=0;}return result;
 }
 static room_http_lifecycle cases[7];
 static room_sdk_stop workers[7];

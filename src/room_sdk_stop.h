@@ -22,9 +22,17 @@ typedef struct {
     httpd_handle_t handle;
     room_sdk_stop_fn stop;
     uint64_t window, deadline, last_ms;
-    bool quarantined;
+    bool quarantined, completed;
+    /* Owner-task only; held from pre-start to successful drain or quarantine. */
+    const void *reservation;
+    uint64_t reserved_window;
 } room_sdk_stop;
 bool room_sdk_stop_bind(room_sdk_stop *);
+bool room_sdk_stop_reserve(room_sdk_stop *,const void *,uint64_t);
+/* Cancel only if no SDK resource or callback was ever published. */
+bool room_sdk_stop_cancel_unstarted(room_sdk_stop *,const void *,uint64_t);
+bool room_sdk_stop_request_for(room_sdk_stop *,const void *,uint64_t,uint64_t,httpd_handle_t,room_sdk_stop_fn);
+room_sdk_stop_result room_sdk_stop_poll_for(room_sdk_stop *,const void *,uint64_t,bool);
 bool room_sdk_stop_request(room_sdk_stop *,uint64_t window,uint64_t deadline_ms,httpd_handle_t,room_sdk_stop_fn);
 room_sdk_stop_result room_sdk_stop_poll(room_sdk_stop *,uint64_t window,bool application_drained);
 #endif
