@@ -24,7 +24,7 @@ typedef struct {
     const uint8_t *reply;
     size_t length,offset;
     uint8_t packet[ROOM_PHONE_PACKET_MAX];
-    bool attempted,stopping;
+    bool attempted,stopping,backend_drained;
 } room_phone_channel;
 bool room_phone_channel_open(room_phone_channel *,room_apsta_task *,room_phone_io);
 bool room_phone_channel_poll(room_phone_channel *);
