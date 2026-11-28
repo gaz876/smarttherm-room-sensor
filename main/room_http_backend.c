@@ -47,7 +47,7 @@ static room_phone_io_result receive(void *ctx,bool *handshake,uint8_t *out,size_
     *handshake=w->handshake;*n=w->length;memcpy(out,w->bytes,*n);
     return ROOM_PHONE_IO_OK;
 }
-static room_phone_io_result send(void *ctx,const uint8_t *data,size_t n,size_t *written) {
+static room_phone_io_result backend_send(void *ctx,const uint8_t *data,size_t n,size_t *written) {
     room_http_backend *b=ctx;
     if(written)*written=0;
     if(!owner(b)||!b->current||!written||!data||!n||n>ROOM_PHONE_PACKET_MAX)return ROOM_PHONE_IO_ERROR;
@@ -96,7 +96,7 @@ bool room_http_backend_prepare(room_http_backend *b,room_http_driver d,room_netw
     if(!b||b->initialized||b->failed||!d.start||!d.publish||!d.stop||!d.peer)return false;
     if(!room_sdk_stop_bind(&b->worker)){b->failed=true;return false;}
     b->driver=d;b->initialized=true;
-    *out=(room_network_setup_backend){.io={b,open_window,receive,send,close_legacy},.close_until=close_until};
+    *out=(room_network_setup_backend){.io={b,open_window,receive,backend_send,close_legacy},.close_until=close_until};
     return true;
 }
 bool room_http_backend_offer(room_http_backend_window *w,room_http_exchange *x,const void *req,bool handshake,const uint8_t *body,size_t n){
