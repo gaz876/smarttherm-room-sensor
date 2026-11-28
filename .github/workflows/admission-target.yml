@@ -1,4 +1,4 @@
-name: Isolated APSTA gate channel host qualification
+name: ESP32-C3 HTTP mailbox HTTP resource stress and APSTA build qualification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -9,19 +9,20 @@ concurrency:
   group: admission-target-20261127
   cancel-in-progress: true
 jobs:
-  host:
+  target:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/admission-target-20261127'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     permissions: {}
     steps:
-      - name: Verify public source and execute isolated owner fixtures
+      - name: Build and run isolated HTTP mailbox HTTP resource stress and APSTA build probe
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=9ddcd5be2a360b4801b12a0e37d2255bd66231cd
+          source_sha=a331e21606f1354b79b3c9db8f5182c7e03c0f37
+          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           mkdir "$work/input"
@@ -29,78 +30,150 @@ jobs:
           git -C "$work/repo" -c credential.helper= fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
           test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
           cat > "$work/manifest" <<'MANIFEST'
+          725c50613c0f9e6c0415fcf6e5adc778c2737acb CMakeLists.txt
+          03c90f47705ae1084f5ce48bb8e0493f8dd97116 main/CMakeLists.txt
+          f68e1fb565eb9426e5756190544a6701f8e2fa9b main/Kconfig.projbuild
+          4dbf841ed19d7c9c41b82a8cc9f43adb41551eae main/main.c
+          465649e490ecb7fb04a459f38430dd5bf00614a4 main/partitions.csv
           6dec750443f18017f2bdae481696f3c695baa8e5 main/room_apsta_events.c
           f5ad9446d56043c2c149189bae35b5230d9c878f main/room_apsta_session.c
           d071f6ec87a99dd3212ccaefdc7ffac5d3fb5455 main/room_apsta_task.c
+          16d4c5be09defb397a5043dc3346a1be5e851e84 main/room_network.c
+          2cb387be7968260e196bdd54756c0a5e92514278 main/room_network.h
           74182937582e0f369bf15c9bd91ae2608a2ca808 main/room_phone_channel.c
+          d72683b31eb8a58f7aa77cabdb334bb08f94c6f5 main/room_runtime.h
+          333b7ff9c53f1aa27473976ab9a725170aaf228f main/room_sdk_stop.c
           6b3f13ec16732752ed7a3f08e01e996e8fa5a73a main/room_sec2_transport.c
+          a39ef2c243fddf4352f1a1109bd6318dc2ca31c2 main/room_settings_nvs.h
+          35082fd814ed10571d342bf4afd3dda48e7c89e2 main/room_wifi_apsta_link.c
+          424d2cb07b123b3469d206f0eda644a6f54ae95d main/room_wifi_apsta_link.h
+          8d764d27b8336ce4ffc32ca940c97336081842ae main/room_wifi_identity_provider.c
+          10ec1b08c0d68f6a0dbc993d3bd4510d02c225eb main/room_wifi_identity_provider.h
+          4214b0aa073296f0c9b9ad9a94338a59bc845c5a main/room_wifi_idf.c
+          750904eaffa822b425d3a18b835acb65ff75f94f main/room_wifi_idf.h
+          189d0ead0151b967dd9756f74d65573592c91030 main/room_wifi_secure_store.c
+          d228329821e19f9cd879f063a17042203eb026ad main/room_wifi_secure_store.h
+          8b0a0571258a170841d4a45d25d2b241a5e4750d sdkconfig.defaults
+          72ee8b425f6c815928b0f0d8c4cd7066300d3748 src/room_admission.h
           576561aeb428498cea13c7f4e3c432459208b0ba src/room_apsta_events.h
           f38e33ea7d2e88158d1440a8e1faccef7a49723c src/room_apsta_owner.h
           e9498dd0cb6c9c467bf9a8aff1e6f50df5d4f262 src/room_apsta_prepare.h
           b0399d6f918eacfb1cdb20f937031a0774c3861f src/room_apsta_session.h
           f9269f2610c1e43e23e2649d052ff714d5a13b2a src/room_apsta_task.h
+          d5efe5952539233c5e392f28571ca626f266e5a9 src/room_board.h
           e0327e9369815404136cad0936ce9a9ea3cfebde src/room_cleanup_budget.h
           7a5935ec5420f61f153723756fe6f2e22f6a7c78 src/room_drain.h
+          28f97afd619a4feb60f40c4bc2ee98cf2853c050 src/room_http_async.h
+          f5ef673856a0643b2ab168bd9195b977458f008d src/room_http_lifecycle.h
+          f616700a5bb757213472bda41623d38119b7bc92 src/room_i2c_retry.h
+          8296297daaeb3c803fdaef07c5f06b79adc23aaa src/room_measure.c
+          713af78bad9e27af4e4bc40decf879e4990c92ca src/room_measure.h
+          0449024abccb96c1429b9cfc2590a7659289d124 src/room_memory_probe.h
           466acbce314ef0554df0527dae2784e1baf32c92 src/room_phone_channel.h
           5953780458aee41ada193557ca0404bd27e9d8e6 src/room_phone_setup.h
+          aabb0d77274bef6828887cb9ec380416b519306e src/room_sdk_stop.h
           aba28c7626f4690783b3f9d9a6ad6e1482092ab9 src/room_sec2_context.h
           61cf3382f5203ce16b943a604166dfadeca0c8c6 src/room_sec2_transport.h
+          8c5df62decaecf856ca4373baa3fb64adb4c37c3 src/room_settings.h
           93ad85f6b486f31db93d9660354303e7da00ec4e src/room_setup_bridge.h
           c772b3e5cdd80f50d5baa1a1c9c9e8e71bae450e src/room_setup_dispatch.h
           6d2d1cee806f170302bad1f3c65a1f7f1301a534 src/room_setup_identity.h
           1d6dc2d75613dbcaaf54aa8bebd92b0164eaf6fa src/room_setup_lifecycle.h
           47d7eba0ef85d65c87ac0dcd3b8ffeb50aae436e src/room_setup_request.h
           43cbe983c6de5120828c8f04f0df5e42fc7f4a41 src/room_wifi_enrollment.h
+          c0c5f6d82dc195a71349b925a6bbd63d6967c0f8 src/room_wifi_owner.h
+          c54bd7ee5916dbc050e4199dce58bb10d2000e06 src/room_wifi_policy.h
+          cc9dc7317de93b38ff49a5dba98af96d3c3c4385 src/sht40.c
+          d40ace0c443e6d96e7a7eaa356e491494f330395 src/sht40.h
           a5c468c6fe7ed7988c3ac7ce9e58983af7df9d23 tests/browser_worker/completion_adapter.h
           c73f0dd25a66edd063f30d314a40b590acebe859 tests/browser_worker/mailbox.h
           94e8fdc7588f03854cc1607cc819ca5d0d36115d tests/browser_worker/stop_gate_adapter.h
           b9e660cd33b41b810b119933f3ebfde551a343ae tests/browser_worker/timed_completion_adapter.h
           a5319c72fcd169b484ffd47f2f3fb53333ac62c6 tests/browser_worker/worker_model.h
-          30eb1a1a6b870642c9e399f1417931851d8dbc38 tests/mock_apsta_owner/esp_netif.h
-          492e645273bf7321c442b0aa835f253a6eba1646 tests/mock_apsta_owner/esp_wifi.h
-          0da3199a2e6ac2ae0479f660fde3d65fac67194f tests/mock_apsta_owner/esp_wifi_default.h
-          6d38e19f7fe23091092cbcadf46d5c3f21abb740 tests/mock_events/esp_event.h
-          9cfa4042223f0c906fa2dad30b97cd635c1e4851 tests/mock_events/freertos/FreeRTOS.h
-          699efa8a0466839e530447183aa6a3ce1471b280 tests/mock_events/freertos/queue.h
-          3c4d551863d2afe9001d0586bf9487f46d4a22a0 tests/mock_sec2_transport/protocomm.h
-          9db20974949148c84b367fab0c8870dd123f2e79 tests/mock_sec2_transport/protocomm_security2.h
-          74ec65cf989890bf962e2a3cd2b2739e28919a10 tests/mock_task/esp_event.h
-          da7c9d67601f6ab53a66b94710b9ac0fccf24846 tests/mock_task/esp_timer.h
-          1b6cc8efcccba2a6d5cc34280ecfc5e69e260409 tests/mock_task/freertos/task.h
-          feb57263825a447fadc3aa66439c01dd85e8b880 tests/test_room_apsta_gate_channel.c
-          76776f376ef57e9562945b33d4bfc6f17a1220e3 tests/test_room_apsta_owner.c
-          a5327b64373ebdb8af5b0456d4affc54185c7c3c tests/test_room_apsta_task.c
-          936b086ed7107d7f45bd774626a7294220493569 tests/test_room_sec2_transport.c
+          739079da75a937ed1c18b7edbe831c0254249780 tests/http_mailbox_sdk_probe/CMakeLists.txt
+          3b982527dccd6279d73dcb90c7ae47970739e4ed tests/http_mailbox_sdk_probe/main/CMakeLists.txt
+          99e129aceeae67faa3d833c1bc05f2d08f972cae tests/http_mailbox_sdk_probe/main/probe.c
+          56c38a500be28c289abcda273ab4ac0ca78a9d81 tests/http_mailbox_sdk_probe/sdkconfig.defaults
           MANIFEST
-          test "$(wc -l < "$work/manifest")" = 42
+          test "$(wc -l < "$work/manifest")" = 64
           while read -r expected path; do
             test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
             mkdir -p "$work/input/$(dirname "$path")"
             git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
             test "$(git hash-object "$work/input/$path")" = "$expected"
           done < "$work/manifest"
-          echo HOST_INPUT_BLOBS_OK=42
+          echo TARGET_INPUT_BLOBS_OK=64
           echo SOURCE_SHA="$source_sha"
-          cd "$work/input"
-          # Synthetic fixtures; no service, listener, credentials or SDK hardware operations.
-          for cc in gcc clang; do
-            "$cc" --version | head -n 1
-            for fixture in test_room_apsta_task test_room_apsta_gate_channel; do
-              "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -O1 -g \
-                -fsanitize=address,undefined -fno-sanitize-recover=all -no-pie \
-                -Itests/mock_task -Itests/mock_events -Itests/mock_apsta_owner \
-                -Itests/mock_sec2_transport -Isrc -Itests/browser_worker \
-                "tests/$fixture.c" main/room_apsta_task.c main/room_apsta_events.c \
-                main/room_apsta_session.c main/room_sec2_transport.c main/room_phone_channel.c \
-                -o "$work/$fixture-$cc"
-              env -i PATH=/usr/bin:/bin ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 \
-                timeout 15s "$work/$fixture-$cc" | tee "$work/$fixture-$cc.log"
-              if test "$fixture" = test_room_apsta_gate_channel; then
-                grep -qx 'APSTA_GATE_CHANNEL_PASS exchanges=12 windows=2' "$work/$fixture-$cc.log"
-              else
-                grep -qx 'APSTA network task mock PASS' "$work/$fixture-$cc.log"
-              fi
-              echo "HOST_FIXTURE_OK $cc $fixture"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
+          test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
+          (cd "$work/input"; echo '547f03e04701a92cbb699f7f7d015adc1f5b5ef93cbb94c0dd9b7107e2d84e77  qemu.tar.xz' | sha256sum -c -)
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
+          probe_rc=0
+          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            idf.py --version
+            riscv32-esp-elf-gcc --version
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            mkdir /tmp/room_sensor /tmp/qemu-tool
+            cp -R --no-preserve=ownership /input/main /input/src /input/tests /tmp/room_sensor/
+            cd /tmp/room_sensor
+            tar --no-same-owner --no-same-permissions -xJf /input/qemu.tar.xz -C /tmp/qemu-tool
+            export PATH="/tmp/qemu-tool/qemu/bin:$PATH"
+            qemu-system-riscv32 --version
+            cd tests/http_mailbox_sdk_probe
+            idf.py set-target esp32c3
+            idf.py build
+            grep -qx "CONFIG_LWIP_NETIF_LOOPBACK=y" sdkconfig
+            test -s build/http_mailbox_sdk_probe.elf
+            test -s build/http_mailbox_sdk_probe.bin
+            idf.py size
+            sha256sum build/http_mailbox_sdk_probe.bin
+            echo TARGET_HTTP_MB_GATE_BUILD_OK
+            rc=0
+            timeout --kill-after=5s 60s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
+            tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
+            cat /tmp/qemu-clean.log
+            test "$rc" = 0 || test "$rc" = 124
+            test "$(grep -cx HTTP_MB_GATE_RACE_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx HTTP_MB_GATE_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -Ec "^HTTP_MB_SOAK_PASS rounds=64 warm=[0-9]+ min=[0-9]+ end=[0-9]+ largest_min=[0-9]+ tasks_warm=[0-9]+ tasks_peak=[0-9]+$" /tmp/qemu-clean.log)" = 1
+            for round in 16 32 48 64; do test "$(grep -Ec "^HTTP_MB_SOAK_SAMPLE round=$round free=[0-9]+ largest=[0-9]+ tasks=[0-9]+$" /tmp/qemu-clean.log)" = 1; done
+            test "$(grep -cx "HTTP_MB_GATE_CASE 1 status=200 ack=1 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_GATE_CASE 2 status=503 ack=1 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_GATE_CASE 3 status=200 ack=0 result=1" /tmp/qemu-clean.log)" = 1
+            test "$(grep -cx "HTTP_MB_GATE_CASE 4 status=200 ack=0 result=2" /tmp/qemu-clean.log)" = 1
+            if grep -E "HTTP_MB_GATE_FAIL|Failed to post esp_http_server event|Guru Meditation|assert failed|abort.*was called" /tmp/qemu-clean.log; then exit 1; fi
+            echo TARGET_HTTP_MB_GATE_QEMU_OK
+          ' || probe_rc=$?
+          build_rc=0
+          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash -euo pipefail -c '
+            test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
+            test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
+            git -C "$IDF_PATH" diff --quiet
+            git -C "$IDF_PATH" diff --cached --quiet
+            git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
+            if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
+            mkdir /tmp/candidate
+            cp -R --no-preserve=ownership /input/main /input/src /input/CMakeLists.txt /input/sdkconfig.defaults /tmp/candidate/
+            cd /tmp/candidate
+            idf.py set-target esp32c3
+            idf.py build
+            grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
+            test -s build/room_sensor.elf
+            test -s build/room_sensor.bin
+            riscv32-esp-elf-nm --defined-only build/room_sensor.elf > /tmp/symbols.txt
+            for symbol in room_apsta_task_bind room_apsta_task_open room_apsta_task_poll room_apsta_task_packet room_apsta_task_sent room_apsta_task_close room_sec2_transport_exchange room_phone_channel_poll room_sdk_stop_bind; do
+              grep -E "[[:space:]][Tt][[:space:]]$symbol$" /tmp/symbols.txt
             done
-          done
-          echo APSTA_GATE_HOST_OK
+            idf.py size
+            sha256sum build/room_sensor.bin
+            echo TARGET_APSTA_CANDIDATE_BUILD_OK
+          ' || build_rc=$?
+          echo "PROBE_EXIT=$probe_rc CANDIDATE_EXIT=$build_rc"
+          test "$probe_rc" = 0
+          test "$build_rc" = 0
