@@ -23,7 +23,7 @@ jobs:
           umask 077
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=d929ba3318a315c69ad1ed7297f42f84ae011742
+          source_sha=7f7a3c7076a217b633e3a400e54593a7f629aa9a
           work="$RUNNER_TEMP/room-integrated-20261128"
           mkdir "$work" "$work/input"
           git init -q "$work/repo"
@@ -38,7 +38,7 @@ jobs:
           384fc79055cc6a4f3cdae70af70fe4b4cb0b9624 main/room_apsta_events.c
           f5ad9446d56043c2c149189bae35b5230d9c878f main/room_apsta_session.c
           d071f6ec87a99dd3212ccaefdc7ffac5d3fb5455 main/room_apsta_task.c
-          f063976fdecb44a61ebb90a22cb0154ecd7695c2 main/room_http_backend.c
+          2a093fcdec820a59b360003ef16128aa8d771745 main/room_http_backend.c
           00988e22e55d32a8fbb49df24f198c1b63191b8d main/room_http_backend.h
           fbfee754f2870123a29a38e8458a0e366da1b800 main/room_http_idf_driver.c
           ce756ae392ed1609e84d90ed60ecb81fb9571083 main/room_http_idf_driver.h
