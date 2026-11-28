@@ -173,16 +173,7 @@ jobs:
           test "$(grep -Fxc SDK_BACKEND_DRAIN_PASS /tmp/qemu-clean.log)" = 1
           test "$(grep -Fxc SDK_BACKEND_RECOVERY_PASS /tmp/qemu-clean.log)" = 1
           test "$(grep -Fxc SDK_BACKEND_PASS /tmp/qemu-clean.log)" = 1
-          test "$(grep -Ec '^SDK_BACKEND_ENDPOINT_FAMILY=[0-9]+/[0-9]+ length=[0-9]+/[0-9]+
-          if grep -E 'SDK_BACKEND_FAIL|SDK_BACKEND_OBSERVE_FAIL|Guru Meditation|assert failed|abort.*was called|Stack canary' /tmp/qemu-clean.log; then exit 1; fi
-          echo SDK_BACKEND_QEMU_OK
-          TARGET
-          chmod -R a+rX -- "$work/input"
-          test -z "$(find "$work/input" -perm /022 -print -quit)"
-          docker pull --platform linux/amd64 "$image"
-          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
-          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash /input/run-probe.sh
- /tmp/qemu-clean.log)" = 1
+          test "$(grep -Ec '^SDK_BACKEND_ENDPOINT_FAMILY=[0-9]+/[0-9]+ length=[0-9]+/[0-9]+$' /tmp/qemu-clean.log)" = 1
           if grep -E 'SDK_BACKEND_FAIL|SDK_BACKEND_OBSERVE_FAIL|Guru Meditation|assert failed|abort.*was called|Stack canary' /tmp/qemu-clean.log; then exit 1; fi
           echo SDK_BACKEND_QEMU_OK
           TARGET
