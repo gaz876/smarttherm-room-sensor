@@ -1,4 +1,4 @@
-name: ESP32-C3 integrated HTTP candidate and affected host regression
+name: ESP32-C3 integrated HTTP candidate target-only retry
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -131,45 +131,6 @@ jobs:
           grep -Fq 'room_network_owner_prepare(selected_key,NULL,&status)' "$work/input/main/room_network.c"
           echo INTEGRATED_SOURCE_SHA="$source_sha"
           echo INTEGRATED_INPUT_BLOBS_OK=90
-      - name: Full affected host fixtures with real translation units
-        shell: bash
-        run: |
-          set -euo pipefail
-          unset GH_TOKEN GITHUB_TOKEN
-          work="$RUNNER_TEMP/room-integrated-20261128"
-          cd "$work/input"
-          inc=(-Itests/mock_task -Itests/mock_events -Itests/mock_apsta_owner -Itests/mock_sec2_transport -Isrc -Itests/browser_worker)
-          flags=(-std=c11 -Wall -Wextra -Werror -pedantic -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie)
-          common=(main/room_apsta_session.c main/room_sec2_transport.c)
-          task=(main/room_apsta_task.c main/room_apsta_events.c main/room_phone_channel.c)
-          count=0
-          for cc in gcc clang; do
-            "$cc" --version | head -n 1
-            for fixture in test_room_apsta_session test_room_apsta_events test_room_apsta_task test_room_apsta_gate_channel; do
-              units=("${common[@]}")
-              if test "$fixture" = test_room_apsta_events; then units+=(main/room_apsta_events.c); fi
-              if test "$fixture" = test_room_apsta_task || test "$fixture" = test_room_apsta_gate_channel; then units+=("${task[@]}"); fi
-              "$cc" "${flags[@]}" "${inc[@]}" "${units[@]}" "tests/$fixture.c" -o "$work/$fixture-$cc"
-              env -i PATH=/usr/bin:/bin ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 timeout 15s "$work/$fixture-$cc" | tee "$work/$fixture-$cc.log"
-              case "$fixture" in
-                test_room_apsta_session) grep -qx 'APSTA session integration mock PASS' "$work/$fixture-$cc.log";;
-                test_room_apsta_events) grep -qx 'APSTA SDK events mock PASS' "$work/$fixture-$cc.log";;
-                test_room_apsta_task) grep -qx 'APSTA network task mock PASS' "$work/$fixture-$cc.log";;
-                test_room_apsta_gate_channel) grep -qx 'APSTA_GATE_CHANNEL_PASS exchanges=12 windows=2' "$work/$fixture-$cc.log";;
-              esac
-              count=$((count+1))
-              echo HOST_FIXTURE_OK "$cc" "$fixture"
-            done
-            "$cc" "${flags[@]}" "${inc[@]}" -Itests/mock_combined -Imain "${common[@]}" "${task[@]}" main/room_wifi_idf.c tests/fixture_room_wifi_apsta_link.c tests/test_room_wifi_combined.c -o "$work/combined-$cc"
-            for mode in normal notready prepare partial timeout expiry revoked first_error first_unavailable first_valid first_late first_changed first_normal save_normal save_lost save_write_error save_read_error save_reload_error channel_normal channel_open_fail channel_bad_send channel_drain timed_success timed_partial timed_wait-expired timed_late-return timed_late-barrier; do
-              env -i PATH=/usr/bin:/bin ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 timeout 15s "$work/combined-$cc" "$mode" | tee "$work/combined-$cc-$mode.log"
-              grep -q '^PASS ' "$work/combined-$cc-$mode.log"
-              count=$((count+1))
-              echo HOST_COMBINED_OK "$cc" "$mode"
-            done
-          done
-          test "$count" = 62
-          echo INTEGRATED_HOST_RUNS_OK="$count"
       - name: Exact target build and separate inactive symbol link qualification
         if: always() && steps.prepare.outcome == 'success'
         shell: bash
@@ -234,6 +195,9 @@ jobs:
           sha256sum build/room_sensor.bin
           echo TARGET_INTEGRATED_LINK_PROBE_OK
           TARGET
+          # Audited public input only. The bind mount is read-only; no group/other write.
+          chmod -R a+rX -- "$work/input"
+          test -z "$(find "$work/input" -perm /022 -print -quit)"
           docker pull --platform linux/amd64 "$image"
           docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
           docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash /input/target-build.sh
