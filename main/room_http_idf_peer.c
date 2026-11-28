@@ -1,7 +1,7 @@
 #include "room_http_idf_peer.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
-#include "lwip/sockets.h"
+#include "room_socket_ipv4.h"
 #include <string.h>
 
 /* Read-only local SDK observations. No real listener is started here.
@@ -26,12 +26,12 @@ bool room_http_idf_peer_observe(void *ctx,const esp_netif_t *ap,const httpd_req_
        esp_netif_dhcps_get_clients_by_mac(netif,1,&pair)!=ESP_OK||!pair.ip.addr||pair.ip.addr==ip.ip.addr)return false;
     /* httpd_req_to_sockfd reads the URI handler's live request. */
     int fd=httpd_req_to_sockfd((httpd_req_t *)r);
-    struct sockaddr_in local={0},remote={0};
+    struct sockaddr_storage local={0},remote={0};
     socklen_t ln=sizeof(local),rn=sizeof(remote);
     if(fd<0||getsockname(fd,(struct sockaddr *)&local,&ln)!=0||
-       getpeername(fd,(struct sockaddr *)&remote,&rn)!=0||ln!=sizeof(local)||rn!=sizeof(remote)||
-       local.sin_family!=AF_INET||remote.sin_family!=AF_INET||
-       local.sin_addr.s_addr!=ip.ip.addr||remote.sin_addr.s_addr!=pair.ip.addr)return false;
+       getpeername(fd,(struct sockaddr *)&remote,&rn)!=0||
+       !room_socket_ipv4_matches(&local,ln,ip.ip.addr)||
+       !room_socket_ipv4_matches(&remote,rn,pair.ip.addr))return false;
     if(!esp_netif_is_netif_up(netif)||esp_wifi_ap_get_sta_list(&after)!=ESP_OK||after.num!=1||
        memcmp(after.sta[0].mac,pair.mac,sizeof(pair.mac))||
        !p->epoch(p->ctx,ap,pair.mac,&final)||final!=before)return false;

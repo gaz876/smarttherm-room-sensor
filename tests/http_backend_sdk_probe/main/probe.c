@@ -2,6 +2,7 @@
  * Real SDK HTTP server, production driver/backend and stop worker. The only
  * test substitutions are AP name lookup and synthetic peer association. */
 #include "room_http_idf_driver.h"
+#include "room_socket_ipv4.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -23,6 +24,7 @@ static TaskHandle_t client_task;
 static int ap_marker;
 static atomic_bool cancel_round, handshake_round;
 static atomic_uint serial;
+static atomic_bool observed_family;
 static const uint8_t reply[]={'P','O','N','G'};
 static esp_netif_t *fake_ap(void){return (esp_netif_t *)(void *)&ap_marker;}
 static uint64_t now(void){int64_t us=esp_timer_get_time();CHECK(us>=0);return (uint64_t)us/1000u;}
@@ -38,14 +40,18 @@ bool room_network_owner_prepare(unsigned key_id,const room_network_setup_backend
 static bool observe(void *ctx,const esp_netif_t *p,const httpd_req_t *req,room_http_peer_observation *o){
     CHECK(ctx==&ap_marker&&p==fake_ap()&&req&&o);
     int fd=httpd_req_to_sockfd((httpd_req_t *)req);
-    struct sockaddr_in local={0},remote={0};socklen_t a=sizeof(local),b=sizeof(remote);
+    struct sockaddr_storage local={0},remote={0};socklen_t a=sizeof(local),b=sizeof(remote);
     if(fd<0||getsockname(fd,(struct sockaddr *)&local,&a)!=0||getpeername(fd,(struct sockaddr *)&remote,&b)!=0){
         printf("SDK_BACKEND_OBSERVE_FAIL socket errno=%d\n",errno);fflush(stdout);return false;
     }
-    if(a!=sizeof(local)||b!=sizeof(remote)||local.sin_family!=AF_INET||remote.sin_family!=AF_INET||
-       local.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)||remote.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)){
-        printf("SDK_BACKEND_OBSERVE_FAIL family=%d/%d length=%u/%u\n",(int)local.sin_family,(int)remote.sin_family,(unsigned)a,(unsigned)b);
+    if(!room_socket_ipv4_matches(&local,a,htonl(INADDR_LOOPBACK))||
+       !room_socket_ipv4_matches(&remote,b,htonl(INADDR_LOOPBACK))){
+        printf("SDK_BACKEND_OBSERVE_FAIL family=%d/%d length=%u/%u\n",(int)local.ss_family,(int)remote.ss_family,(unsigned)a,(unsigned)b);
         fflush(stdout);return false;
+    }
+    if(!atomic_exchange(&observed_family,true)){
+        printf("SDK_BACKEND_ENDPOINT_FAMILY=%d/%d length=%u/%u\n",
+            (int)local.ss_family,(int)remote.ss_family,(unsigned)a,(unsigned)b);fflush(stdout);
     }
     /* Fixed test-local identity only. This does NOT qualify real AP evidence. */
     *o=(room_http_peer_observation){true,true,true,1,42};
@@ -112,7 +118,7 @@ static void finish_close(uint64_t w,uint64_t end){
 void app_main(void){
     CHECK(esp_netif_init()==ESP_OK);
     CHECK(esp_event_loop_create_default()==ESP_OK);
-    atomic_init(&cancel_round,false);atomic_init(&handshake_round,false);atomic_init(&serial,0u);
+    atomic_init(&cancel_round,false);atomic_init(&handshake_round,false);atomic_init(&serial,0u);atomic_init(&observed_family,false);
     client_done=xSemaphoreCreateBinary();CHECK(client_done);
     CHECK(xTaskCreate(client,"loop_client",4096,NULL,3,&client_task)==pdPASS);
     room_http_driver d={0};

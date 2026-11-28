@@ -127,6 +127,7 @@ static room_http_idf_driver sdk_driver;
 static uint64_t association=1,identity=42;
 /* Synthetic read-only SDK evidence; no actual sockets or radio. */
 static unsigned evidence_fault,evidence_epoch_reads,evidence_list_reads;
+static bool evidence_mapped;
 static const uint8_t peer_mac[]={2,0,0,0,0,42};
 static const uint32_t ap_ip=UINT32_C(0x0100000a),peer_ip=UINT32_C(0x0200000a);
 bool esp_netif_is_netif_up(esp_netif_t *p){return p==&ap&&evidence_fault!=1;}
@@ -135,23 +136,40 @@ esp_err_t esp_netif_dhcps_get_status(esp_netif_t *p,esp_netif_dhcp_status_t *st)
 esp_err_t esp_wifi_ap_get_sta_list(wifi_sta_list_t *v){++evidence_list_reads;v->num=evidence_fault==4?0:evidence_fault==5?2:1;memcpy(v->sta[0].mac,peer_mac,6);if(evidence_fault==13&&evidence_list_reads%2==0)v->sta[0].mac[5]++;return evidence_fault==6?ESP_FAIL:ESP_OK;}
 esp_err_t esp_netif_dhcps_get_clients_by_mac(esp_netif_t *p,int n,esp_netif_pair_mac_ip_t *v){assert(p==&ap&&n==1&&!memcmp(v->mac,peer_mac,6));v->ip.addr=evidence_fault==7?0:peer_ip;return evidence_fault==8?ESP_FAIL:ESP_OK;}
 int httpd_req_to_sockfd(httpd_req_t *r){assert(r==&sdk_request);return evidence_fault==9?-1:123;}
-static int mock_endpoint(int fd,struct sockaddr *s,socklen_t *len,bool local){assert(fd==123&&*len==sizeof(struct sockaddr_in));struct sockaddr_in addr={0};addr.sin_family=evidence_fault==12?AF_INET6:AF_INET;addr.sin_addr.s_addr=local?(evidence_fault==10?peer_ip:ap_ip):(evidence_fault==11?ap_ip:peer_ip);memcpy(s,&addr,sizeof(addr));return evidence_fault==14?-1:0;}
+static int mock_endpoint(int fd,struct sockaddr *s,socklen_t *len,bool local){
+    assert(fd==123&&*len==sizeof(struct sockaddr_storage));
+    uint32_t addr=local?(evidence_fault==10?peer_ip:ap_ip):(evidence_fault==11?ap_ip:peer_ip);
+    if(evidence_mapped){
+        struct sockaddr_in6 v={0};v.sin6_family=AF_INET6;
+        v.sin6_addr.s6_addr[10]=255;v.sin6_addr.s6_addr[11]=255;
+        memcpy(v.sin6_addr.s6_addr+12,&addr,sizeof(addr));
+        if(evidence_fault==12)v.sin6_addr.s6_addr[0]=0xfe;
+        memcpy(s,&v,sizeof(v));*len=sizeof(v);
+    }else{
+        struct sockaddr_in v={0};v.sin_family=evidence_fault==12?AF_INET6:AF_INET;v.sin_addr.s_addr=addr;
+        memcpy(s,&v,sizeof(v));*len=sizeof(v);
+    }
+    return evidence_fault==14?-1:0;
+}
 int mock_getsockname(int fd,struct sockaddr *s,socklen_t *n){return mock_endpoint(fd,s,n,true);}
 int mock_getpeername(int fd,struct sockaddr *s,socklen_t *n){return mock_endpoint(fd,s,n,false);}
 static bool local_epoch(void *ctx,const esp_netif_t *p,const uint8_t mac[6],uint64_t *token){assert(ctx==&ap&&p==&ap&&!memcmp(mac,peer_mac,6));++evidence_epoch_reads;*token=association+(evidence_fault==15&&evidence_epoch_reads%2==0?1u:0u);return evidence_fault!=16;}
 static room_http_idf_peer peer_source={&ap,local_epoch};
 static void evidence_case(void){
-    room_http_peer_observation o={0};
-    assert(room_http_idf_peer_observe(&peer_source,&ap,&sdk_request,&o));
-    assert(o.association==association&&o.peer&&o.current_ap&&o.single_peer&&o.endpoint_matches);
-    for(evidence_fault=1;evidence_fault<=16;++evidence_fault){
-        evidence_epoch_reads=evidence_list_reads=0;
-        assert(!room_http_idf_peer_observe(&peer_source,&ap,&sdk_request,&o));
-        assert(!o.current_ap&&!o.single_peer&&!o.endpoint_matches&&!o.association&&!o.peer);
+    for(unsigned form=0;form<2;++form){
+        evidence_mapped=form!=0;evidence_fault=0;
+        room_http_peer_observation o={0};
+        assert(room_http_idf_peer_observe(&peer_source,&ap,&sdk_request,&o));
+        assert(o.association==association&&o.peer&&o.current_ap&&o.single_peer&&o.endpoint_matches);
+        for(evidence_fault=1;evidence_fault<=16;++evidence_fault){
+            evidence_epoch_reads=evidence_list_reads=0;
+            assert(!room_http_idf_peer_observe(&peer_source,&ap,&sdk_request,&o));
+            assert(!o.current_ap&&!o.single_peer&&!o.endpoint_matches&&!o.association&&!o.peer);
+        }
+        evidence_fault=0;assert(!room_http_idf_peer_observe(&peer_source,&other,&sdk_request,&o));
+        room_http_idf_peer no_epoch={0};assert(!room_http_idf_peer_observe(&no_epoch,&ap,&sdk_request,&o));
     }
-    evidence_fault=0;assert(!room_http_idf_peer_observe(&peer_source,&other,&sdk_request,&o));
-    room_http_idf_peer no_epoch={0};assert(!room_http_idf_peer_observe(&no_epoch,&ap,&sdk_request,&o));
-    printf("SDK_EVIDENCE_REJECTIONS=18\n");
+    printf("SDK_EVIDENCE_REJECTIONS=36 forms=2\n");
 }
 static bool trusted_peer(void *ctx,const esp_netif_t *p,const httpd_req_t *r,room_http_peer_observation *o){
     if(ctx!=&ap||p!=&ap||r!=&sdk_request||idf_peer_error)return false;
