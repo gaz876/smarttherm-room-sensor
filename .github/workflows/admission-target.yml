@@ -1,4 +1,4 @@
-name: ESP32-C3 dual-stack endpoint qualification
+name: Offline MQTT sample host tests
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -9,176 +9,55 @@ concurrency:
   group: admission-target-20261127
   cancel-in-progress: true
 jobs:
-  target:
+  host:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/admission-target-20261127'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Fetch immutable audited public test inputs
+      - name: Fetch immutable public test inputs
         shell: bash
         run: |
           set -euo pipefail
           umask 077
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=8447943518ef69c3002bd12277693d253a43c276
-          work="$RUNNER_TEMP/room-backend-target"
+          source_sha=f3635f85879bbc6d923af535b56ab8cabb5a670d
+          work="$RUNNER_TEMP/room-mqtt-sample"
           mkdir "$work" "$work/input"
           git init -q "$work/repo"
           git -C "$work/repo" -c credential.helper= -c core.hooksPath=/dev/null fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
           test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
           cat > "$work/manifest" <<'MANIFEST'
-          2a093fcdec820a59b360003ef16128aa8d771745 main/room_http_backend.c
-          00988e22e55d32a8fbb49df24f198c1b63191b8d main/room_http_backend.h
-          fbfee754f2870123a29a38e8458a0e366da1b800 main/room_http_idf_driver.c
-          ce756ae392ed1609e84d90ed60ecb81fb9571083 main/room_http_idf_driver.h
-          dc2491e8197d5ff40cd87492025a7f75117c90e3 main/room_http_idf_peer.c
-          1569cd043490eb8fc8eb0da452a89d552da758cc main/room_http_idf_peer.h
-          524cb78cfaaa80e1e1c683529753a91c84081ce2 main/room_network_owner.c
-          0911fa3312e6cf254afd8b66f4308b968796a238 main/room_network_owner.h
-          333b7ff9c53f1aa27473976ab9a725170aaf228f main/room_sdk_stop.c
-          ac7c77c77ab8dc34eece56f1672f52f056fd5868 main/room_wifi_apsta_link.h
-          750904eaffa822b425d3a18b835acb65ff75f94f main/room_wifi_idf.h
-          d228329821e19f9cd879f063a17042203eb026ad main/room_wifi_secure_store.h
-          72ee8b425f6c815928b0f0d8c4cd7066300d3748 src/room_admission.h
-          1b89623954ac693078cf51b905bf52d5a8ebeb86 src/room_apsta_events.h
-          f38e33ea7d2e88158d1440a8e1faccef7a49723c src/room_apsta_owner.h
-          e9498dd0cb6c9c467bf9a8aff1e6f50df5d4f262 src/room_apsta_prepare.h
-          b0399d6f918eacfb1cdb20f937031a0774c3861f src/room_apsta_session.h
-          f9269f2610c1e43e23e2649d052ff714d5a13b2a src/room_apsta_task.h
-          d5efe5952539233c5e392f28571ca626f266e5a9 src/room_board.h
-          e0327e9369815404136cad0936ce9a9ea3cfebde src/room_cleanup_budget.h
-          7a5935ec5420f61f153723756fe6f2e22f6a7c78 src/room_drain.h
-          28f97afd619a4feb60f40c4bc2ee98cf2853c050 src/room_http_async.h
-          6cae56a6d2ca2ec30f5aee81c547ab3fd3a787db src/room_http_lifecycle.h
-          26a83193113b5581ad0e886c6e432b166d9c1ebe src/room_http_peer_guard.h
-          f616700a5bb757213472bda41623d38119b7bc92 src/room_i2c_retry.h
+          8296297daaeb3c803fdaef07c5f06b79adc23aaa src/room_measure.c
           713af78bad9e27af4e4bc40decf879e4990c92ca src/room_measure.h
-          0449024abccb96c1429b9cfc2590a7659289d124 src/room_memory_probe.h
-          466acbce314ef0554df0527dae2784e1baf32c92 src/room_phone_channel.h
-          5953780458aee41ada193557ca0404bd27e9d8e6 src/room_phone_setup.h
-          aabb0d77274bef6828887cb9ec380416b519306e src/room_sdk_stop.h
-          aba28c7626f4690783b3f9d9a6ad6e1482092ab9 src/room_sec2_context.h
-          61cf3382f5203ce16b943a604166dfadeca0c8c6 src/room_sec2_transport.h
-          8c5df62decaecf856ca4373baa3fb64adb4c37c3 src/room_settings.h
-          93ad85f6b486f31db93d9660354303e7da00ec4e src/room_setup_bridge.h
-          c772b3e5cdd80f50d5baa1a1c9c9e8e71bae450e src/room_setup_dispatch.h
-          6d2d1cee806f170302bad1f3c65a1f7f1301a534 src/room_setup_identity.h
-          1d6dc2d75613dbcaaf54aa8bebd92b0164eaf6fa src/room_setup_lifecycle.h
-          47d7eba0ef85d65c87ac0dcd3b8ffeb50aae436e src/room_setup_request.h
-          85ad8a666f3579646c9f5118ea0c7cb38b0355fb src/room_socket_ipv4.h
-          43cbe983c6de5120828c8f04f0df5e42fc7f4a41 src/room_wifi_enrollment.h
-          c0c5f6d82dc195a71349b925a6bbd63d6967c0f8 src/room_wifi_owner.h
-          c54bd7ee5916dbc050e4199dce58bb10d2000e06 src/room_wifi_policy.h
+          cc9dc7317de93b38ff49a5dba98af96d3c3c4385 src/sht40.c
           d40ace0c443e6d96e7a7eaa356e491494f330395 src/sht40.h
-          0a72111f085f44a0bc99c259f53c403b251b8296 tests/http_backend_sdk_probe/CMakeLists.txt
-          964a3869e52b91915c403e12d9ba52d9d4a2ad2e tests/http_backend_sdk_probe/main/CMakeLists.txt
-          c7f78c60a5a6f6360e22bd5e92071212d4027de9 tests/http_backend_sdk_probe/main/probe.c
-          ec3cf7a25ab23c99d4752598d385f9ad656e3fea tests/http_backend_sdk_probe/sdkconfig.defaults
-          c5bd10c9b78dc8bd2f6038f1487709e593f3b6b1 tests/mock_http_backend/esp_http_server.h
-          d0f3689bc672f3b68cad45ad002737192bc11521 tests/mock_http_backend/esp_netif.h
-          e46e29ec7864ec9461b56d1d37e020877fdca159 tests/mock_http_backend/esp_timer.h
-          a77a07f280c207708f1311c1f26b0fd056775255 tests/mock_http_backend/esp_wifi.h
-          b6e3d7e68ae732740567d65ad1cf5d073c96f271 tests/mock_http_backend/freertos/FreeRTOS.h
-          0c8e6ba6955f04fd95414973fe461efe1ea1778d tests/mock_http_backend/freertos/task.h
-          4b2eb8e64737f65d5951660080204a694c0c2f33 tests/mock_http_backend/lwip/sockets.h
-          69998df3bdd04bb91de36fdc2baf9a8b2815b2a3 tests/mock_http_backend/room_wifi_apsta_link.h
-          d849fba41a22844925803c455e6e898096b295c5 tests/mock_http_backend/room_wifi_identity_provider.h
-          0a3cde63d7be7b318a78345a03364b6f77f6318b tests/mock_http_backend/room_wifi_idf.h
-          c4b50ad87f4905d9733cf67d827de3e882c3238f tests/mock_http_backend/room_wifi_secure_store.h
-          21ceb5a29be06373c0cbc35eca868848835be136 tests/run_room_http_backend_host.sh
-          c3a366a8ebe572aeeea9d2cee0b33af94cea24d6 tests/test_room_http_backend.c
+          afbf55b1e55fd256d2b074911098a3f3c079c70a src/room_mqtt_sample.c
+          1f1cf5b0bcaf889daa5c2b0c24f80d73fe06ae3e src/room_mqtt_sample.h
+          531448d6e38b355e6b95563bc9aa34111420cf13 tests/test_room_mqtt_sample.c
           MANIFEST
-          test "$(wc -l < "$work/manifest")" = 60
+          test "$(wc -l < "$work/manifest")" = 7
           while read -r expected path; do
             test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
             mkdir -p "$work/input/$(dirname "$path")"
             git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
             test "$(git hash-object "$work/input/$path")" = "$expected"
           done < "$work/manifest"
-          echo BACKEND_TARGET_SOURCE_SHA="$source_sha"
-          echo BACKEND_TARGET_INPUT_BLOBS_OK=60
-          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 120 -o "$work/input/qemu.tar.xz" https://github.com/espressif/qemu/releases/download/esp-develop-9.2.2-20260417/qemu-riscv32-softmmu-esp_develop_9.2.2_20260417-x86_64-linux-gnu.tar.xz
-          test "$(stat -c %s "$work/input/qemu.tar.xz")" = 16842920
-          (cd "$work/input"; echo '547f03e04701a92cbb699f7f7d015adc1f5b5ef93cbb94c0dd9b7107e2d84e77  qemu.tar.xz' | sha256sum -c -)
-      - name: Affected host evidence checks GCC and Clang
+          echo MQTT_SAMPLE_SOURCE_SHA="$source_sha"
+          echo MQTT_SAMPLE_INPUT_BLOBS_OK=7
+      - name: Execute offline sample tests on GCC and Clang
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          work="$RUNNER_TEMP/room-backend-target"
+          work="$RUNNER_TEMP/room-mqtt-sample"
           cd "$work/input"
-          mkdir "$work/host"
-          for f in room_http_backend.c room_http_backend.h room_http_idf_driver.c room_http_idf_driver.h room_http_idf_peer.c room_http_idf_peer.h room_network_owner.c room_network_owner.h room_sdk_stop.c; do
-            cp "main/$f" "$work/host/$f"
-            cmp "main/$f" "$work/host/$f"
-          done
           for cc in gcc clang; do
             "$cc" --version | head -n 1
-            "$cc" -D_DEFAULT_SOURCE -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -pthread -Itests/mock_http_backend -Isrc -I"$work/host" "$work/host/room_http_backend.c" "$work/host/room_http_idf_driver.c" "$work/host/room_http_idf_peer.c" "$work/host/room_network_owner.c" "$work/host/room_sdk_stop.c" tests/test_room_http_backend.c -o "$work/host/check-$cc"
-            for mode in idf-evidence idf-restart; do
-              env -i PATH=/usr/bin:/bin ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 timeout 15s "$work/host/check-$cc" "$mode" | tee "$work/host/$cc-$mode.log"
-              grep -Fqx "PASS http-backend $mode" "$work/host/$cc-$mode.log"
-              echo DUALSTACK_HOST_PASS "$cc" "$mode"
-            done
-            grep -Fqx 'SDK_ENDPOINT_FORMAT_CHECKS_OK' "$work/host/$cc-idf-evidence.log"
-            grep -Fqx 'SDK_EVIDENCE_REJECTIONS=36 forms=2' "$work/host/$cc-idf-evidence.log"
-            grep -Fqx 'SDK_RESTART_WINDOWS=24 successful_exchanges=48' "$work/host/$cc-idf-restart.log"
+            env -i PATH=/usr/bin:/bin HOME="$work" "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -Isrc src/room_measure.c src/sht40.c src/room_mqtt_sample.c tests/test_room_mqtt_sample.c -lm -o "$work/test-$cc"
+            env -i PATH=/usr/bin:/bin HOME="$work" ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 timeout 15s "$work/test-$cc" | tee "$work/$cc.log"
+            test "$(grep -Fxc MQTT_SAMPLE_OFFLINE_PASS "$work/$cc.log")" = 1
+            echo MQTT_SAMPLE_COMPILER_OK="$cc"
           done
-          echo DUALSTACK_HOST_RUNS_OK=4
-      - name: Build and execute isolated SDK HTTP probe
-        shell: bash
-        run: |
-          set -euo pipefail
-          unset GH_TOKEN GITHUB_TOKEN
-          work="$RUNNER_TEMP/room-backend-target"
-          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
-          cat > "$work/input/run-probe.sh" <<'TARGET'
-          set -euo pipefail
-          test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
-          git -C "$IDF_PATH" diff --quiet
-          git -C "$IDF_PATH" diff --cached --quiet
-          git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
-          if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
-          sha256sum /tmp/submodules.txt
-          idf.py --version
-          riscv32-esp-elf-gcc --version
-          test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
-          python -m pip check
-          mkdir /tmp/room_sensor /tmp/qemu-tool
-          cp -R --no-preserve=ownership /input/main /input/src /input/tests /tmp/room_sensor/
-          tar --no-same-owner --no-same-permissions -xJf /input/qemu.tar.xz -C /tmp/qemu-tool
-          export PATH="/tmp/qemu-tool/qemu/bin:$PATH"
-          qemu-system-riscv32 --version
-          cd /tmp/room_sensor/tests/http_backend_sdk_probe
-          idf.py set-target esp32c3
-          idf.py build
-          grep -qx 'CONFIG_LWIP_IPV6=y' sdkconfig
-          grep -qx 'CONFIG_LWIP_NETIF_LOOPBACK=y' sdkconfig
-          grep -qx 'CONFIG_ESP_SYSTEM_PANIC_PRINT_HALT=y' sdkconfig
-          echo SDK_BACKEND_DUALSTACK_CONFIG_OK
-          test -s build/http_backend_sdk_probe.elf
-          test -s build/http_backend_sdk_probe.bin
-          test -s build/esp-idf/main/CMakeFiles/__idf_main.dir/tmp/room_sensor/main/room_http_idf_peer.c.obj || test "$(find build/esp-idf/main -name room_http_idf_peer.c.obj -size +0c | wc -l)" = 1
-          idf.py size
-          sha256sum build/http_backend_sdk_probe.bin
-          echo SDK_BACKEND_BUILD_OK
-          rc=0
-          timeout --kill-after=5s 60s idf.py qemu --qemu-extra-args="-nic none" </dev/null > /tmp/qemu.log 2>&1 || rc=$?
-          tr -d "\r" < /tmp/qemu.log > /tmp/qemu-clean.log
-          cat /tmp/qemu-clean.log
-          test "$rc" = 0 || test "$rc" = 124
-          test "$(grep -Fxc 'SDK_BACKEND_RESTART_PASS windows=8 exchanges=16' /tmp/qemu-clean.log)" = 1
-          test "$(grep -Fxc SDK_BACKEND_DRAIN_PASS /tmp/qemu-clean.log)" = 1
-          test "$(grep -Fxc SDK_BACKEND_RECOVERY_PASS /tmp/qemu-clean.log)" = 1
-          test "$(grep -Fxc SDK_BACKEND_PASS /tmp/qemu-clean.log)" = 1
-          test "$(grep -Ec '^SDK_BACKEND_ENDPOINT_FAMILY=[0-9]+/[0-9]+ length=[0-9]+/[0-9]+$' /tmp/qemu-clean.log)" = 1
-          if grep -E 'SDK_BACKEND_FAIL|SDK_BACKEND_OBSERVE_FAIL|Guru Meditation|assert failed|abort.*was called|Stack canary' /tmp/qemu-clean.log; then exit 1; fi
-          echo SDK_BACKEND_QEMU_OK
-          TARGET
-          chmod -R a+rX -- "$work/input"
-          test -z "$(find "$work/input" -perm /022 -print -quit)"
-          docker pull --platform linux/amd64 "$image"
-          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
-          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash /input/run-probe.sh
+          echo MQTT_SAMPLE_HOST_RUNS_OK=2
