@@ -22,7 +22,7 @@
  * only the observed SDK stop result authorizes mailbox reuse. */
 #define CHECK(x) do { if(!(x)){printf("HTTP_MB_GATE_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
 typedef enum { NORMAL, APP_ERROR, CLOSE_PENDING, LATE } mode;
-enum { REPEAT_ROUNDS=16 };
+enum { REPEAT_ROUNDS=64 };
 typedef struct {
     room_http_lifecycle life;
     room_http_async async[REPEAT_ROUNDS];
@@ -84,7 +84,8 @@ static void client(void *ctx){
     CHECK(inet_pton(AF_INET,"127.0.0.1",&address.sin_addr)==1);
     CHECK(connect(fd,(struct sockaddr *)&address,sizeof address)==0);
     char req[]="POST /probe HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 3\r\n\r\nABC";
-    req[sizeof(req)-2]=(char)('A'+f->round);
+    req[sizeof(req)-3]=(char)('0'+f->round/10u);
+    req[sizeof(req)-2]=(char)('0'+f->round%10u);
     size_t sent=0;while(sent<sizeof(req)-1){ssize_t n=send(fd,req+sent,sizeof(req)-1-sent,0);CHECK(n>0);sent+=(size_t)n;}
     char buf[512]={0};size_t used=0;
     while(!strstr(buf,response(f))){CHECK(used<sizeof(buf)-1);ssize_t n=recv(fd,buf+used,sizeof(buf)-1-used,0);CHECK(n>0);used+=(size_t)n;buf[used]='\0';}
@@ -108,7 +109,8 @@ static void scenario(fixture *f,unsigned w,mode m){
     httpd_uri_t uri={.uri="/probe",.method=HTTP_POST,.handler=uri_handler,.user_ctx=f};
     CHECK(httpd_register_uri_handler(server,&uri)==ESP_OK);
     unsigned rounds=m==NORMAL?REPEAT_ROUNDS:1u;
-    size_t heap_warm=0,heap_min=SIZE_MAX;
+    size_t heap_warm=0,heap_min=SIZE_MAX,heap_end=0,largest_min=SIZE_MAX;
+    unsigned task_warm=0,task_peak=0;
     uint64_t deadline=0;bool closing=m==CLOSE_PENDING||m==LATE;
     for(unsigned i=0;i<rounds;i++){
     f->round=i;f->claimed=false;
@@ -116,7 +118,7 @@ static void scenario(fixture *f,unsigned w,mode m){
     CHECK(xTaskCreate(client,"mb_client",4096,f,3,NULL)==pdPASS);
     take(f->submitted);mb_reply out;uint8_t request[3]={0};char reply[32]={0};
     CHECK(event(f,(mb_event){.action=MB_TAKE_REQUEST,.ticket=f->ticket,.output=request,.size=sizeof request},false,&out)==ACK_OK);
-    CHECK(out.length==3&&request[0]=='A'&&request[1]=='B'&&request[2]==(uint8_t)('A'+i));
+    CHECK(out.length==3&&request[0]=='A'&&request[1]==(uint8_t)('0'+i/10u)&&request[2]==(uint8_t)('0'+i%10u));
     CHECK(f->ticket==(uint64_t)i+1u);wipe(request,sizeof request);
     CHECK(event(f,(mb_event){.action=MB_TAKE_REQUEST,.ticket=f->ticket,.output=request,.size=sizeof request},false,&out)==ACK_REJECT);
     size_t n=strlen(response(f));memcpy(reply,response(f),n);
@@ -147,13 +149,22 @@ static void scenario(fixture *f,unsigned w,mode m){
         vTaskDelay(2);
         CHECK(heap_caps_check_integrity_all(true));
         size_t free_bytes=heap_caps_get_free_size(MALLOC_CAP_8BIT);
-        if(i==3)heap_warm=free_bytes;
-        if(i>=3&&free_bytes<heap_min)heap_min=free_bytes;
+        unsigned tasks=(unsigned)uxTaskGetNumberOfTasks();
+        size_t largest=heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        if(i==3){heap_warm=free_bytes;task_warm=tasks;}
+        if(i>=3){
+            if(free_bytes<heap_min)heap_min=free_bytes;
+            if(largest<largest_min)largest_min=largest;
+            if(tasks>task_peak)task_peak=tasks;
+            heap_end=free_bytes;
+        }
+        if((i+1u)%16u==0){printf("HTTP_MB_SOAK_SAMPLE round=%u free=%u largest=%u tasks=%u\n",i+1u,(unsigned)free_bytes,(unsigned)largest,tasks);fflush(stdout);}
     }
     }
     if(m==NORMAL){
         CHECK(heap_warm&&heap_min&&heap_min<=heap_warm&&heap_warm-heap_min<=16384u);
-        printf("HTTP_MB_REPEAT_PASS rounds=%u warm=%u min=%u\n",rounds,(unsigned)heap_warm,(unsigned)heap_min);fflush(stdout);
+        CHECK(task_warm&&task_peak<=task_warm);
+        printf("HTTP_MB_SOAK_PASS rounds=%u warm=%u min=%u end=%u largest_min=%u tasks_warm=%u tasks_peak=%u\n",rounds,(unsigned)heap_warm,(unsigned)heap_min,(unsigned)heap_end,(unsigned)largest_min,task_warm,task_peak);fflush(stdout);
         deadline=now()+1500u;
     }
     if(!closing){CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);}
@@ -165,6 +176,16 @@ static void scenario(fixture *f,unsigned w,mode m){
     CHECK(gate_open(&f->box,w+100,read_clock,NULL)==!locked);
     if(!locked)CHECK(gate_close_until(&f->box,w+100,now()+1000u,true,true,read_clock,NULL)==ACK_OK);
     if(locked)CHECK(!room_http_prepare(&forbidden,&worker,w+1));
+    else {
+        /* On this single-core fixture both higher-priority tasks have exited;
+         * successful SDK stop also proves no callback retains the handles. */
+        vTaskDelay(2);
+        vSemaphoreDelete(f->submitted);vSemaphoreDelete(f->published);vSemaphoreDelete(f->sent);
+        vSemaphoreDelete(f->allow_complete);vSemaphoreDelete(f->completed);vSemaphoreDelete(f->allow_ack);
+        vSemaphoreDelete(f->responder_done);vSemaphoreDelete(f->client_read);
+        vSemaphoreDelete(f->allow_client_close);vSemaphoreDelete(f->client_done);
+        CHECK(heap_caps_check_integrity_all(true));
+    }
     printf("HTTP_MB_GATE_CASE %u status=%u ack=%u result=%d\n",w,m==APP_ERROR?503u:200u,closing?0u:1u,(int)rc);fflush(stdout);
 }
 /* Deliberately blocked clock only in this isolated scheduling fixture.
