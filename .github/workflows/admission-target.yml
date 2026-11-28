@@ -1,4 +1,4 @@
-name: ESP32-C3 integrated HTTP candidate target-only retry
+name: ESP32-C3 HTTP backend host regression
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -9,14 +9,13 @@ concurrency:
   group: admission-target-20261127
   cancel-in-progress: true
 jobs:
-  target:
+  host:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/admission-target-20261127'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     permissions: {}
     steps:
       - name: Fetch immutable audited public source
-        id: prepare
         shell: bash
         run: |
           set -euo pipefail
@@ -24,20 +23,12 @@ jobs:
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
           source_sha=7f7a3c7076a217b633e3a400e54593a7f629aa9a
-          work="$RUNNER_TEMP/room-integrated-20261128"
+          work="$RUNNER_TEMP/room-backend-host"
           mkdir "$work" "$work/input"
           git init -q "$work/repo"
           git -C "$work/repo" -c credential.helper= -c core.hooksPath=/dev/null fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
           test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
           cat > "$work/manifest" <<'MANIFEST'
-          725c50613c0f9e6c0415fcf6e5adc778c2737acb CMakeLists.txt
-          4dd9011d657ba72f8562c30e7f8fe9a4d1fa46d7 main/CMakeLists.txt
-          f68e1fb565eb9426e5756190544a6701f8e2fa9b main/Kconfig.projbuild
-          4dbf841ed19d7c9c41b82a8cc9f43adb41551eae main/main.c
-          465649e490ecb7fb04a459f38430dd5bf00614a4 main/partitions.csv
-          384fc79055cc6a4f3cdae70af70fe4b4cb0b9624 main/room_apsta_events.c
-          f5ad9446d56043c2c149189bae35b5230d9c878f main/room_apsta_session.c
-          d071f6ec87a99dd3212ccaefdc7ffac5d3fb5455 main/room_apsta_task.c
           2a093fcdec820a59b360003ef16128aa8d771745 main/room_http_backend.c
           00988e22e55d32a8fbb49df24f198c1b63191b8d main/room_http_backend.h
           fbfee754f2870123a29a38e8458a0e366da1b800 main/room_http_idf_driver.c
@@ -46,158 +37,49 @@ jobs:
           1569cd043490eb8fc8eb0da452a89d552da758cc main/room_http_idf_peer.h
           524cb78cfaaa80e1e1c683529753a91c84081ce2 main/room_network_owner.c
           0911fa3312e6cf254afd8b66f4308b968796a238 main/room_network_owner.h
-          c0ea41a0fa55466f426e1aed951f56ca45576261 main/room_network.c
-          2cb387be7968260e196bdd54756c0a5e92514278 main/room_network.h
-          74182937582e0f369bf15c9bd91ae2608a2ca808 main/room_phone_channel.c
-          d72683b31eb8a58f7aa77cabdb334bb08f94c6f5 main/room_runtime.h
           333b7ff9c53f1aa27473976ab9a725170aaf228f main/room_sdk_stop.c
-          6b3f13ec16732752ed7a3f08e01e996e8fa5a73a main/room_sec2_transport.c
-          a39ef2c243fddf4352f1a1109bd6318dc2ca31c2 main/room_settings_nvs.h
-          0a046622e7fcbbd7f73af17e5815936f423a769f main/room_wifi_apsta_link.c
-          ac7c77c77ab8dc34eece56f1672f52f056fd5868 main/room_wifi_apsta_link.h
-          8d764d27b8336ce4ffc32ca940c97336081842ae main/room_wifi_identity_provider.c
-          10ec1b08c0d68f6a0dbc993d3bd4510d02c225eb main/room_wifi_identity_provider.h
-          4214b0aa073296f0c9b9ad9a94338a59bc845c5a main/room_wifi_idf.c
-          750904eaffa822b425d3a18b835acb65ff75f94f main/room_wifi_idf.h
-          189d0ead0151b967dd9756f74d65573592c91030 main/room_wifi_secure_store.c
-          d228329821e19f9cd879f063a17042203eb026ad main/room_wifi_secure_store.h
-          8b0a0571258a170841d4a45d25d2b241a5e4750d sdkconfig.defaults
           72ee8b425f6c815928b0f0d8c4cd7066300d3748 src/room_admission.h
-          1b89623954ac693078cf51b905bf52d5a8ebeb86 src/room_apsta_events.h
-          f38e33ea7d2e88158d1440a8e1faccef7a49723c src/room_apsta_owner.h
-          e9498dd0cb6c9c467bf9a8aff1e6f50df5d4f262 src/room_apsta_prepare.h
-          b0399d6f918eacfb1cdb20f937031a0774c3861f src/room_apsta_session.h
-          f9269f2610c1e43e23e2649d052ff714d5a13b2a src/room_apsta_task.h
-          d5efe5952539233c5e392f28571ca626f266e5a9 src/room_board.h
-          e0327e9369815404136cad0936ce9a9ea3cfebde src/room_cleanup_budget.h
-          7a5935ec5420f61f153723756fe6f2e22f6a7c78 src/room_drain.h
-          28f97afd619a4feb60f40c4bc2ee98cf2853c050 src/room_http_async.h
           6cae56a6d2ca2ec30f5aee81c547ab3fd3a787db src/room_http_lifecycle.h
           26a83193113b5581ad0e886c6e432b166d9c1ebe src/room_http_peer_guard.h
-          f616700a5bb757213472bda41623d38119b7bc92 src/room_i2c_retry.h
-          8296297daaeb3c803fdaef07c5f06b79adc23aaa src/room_measure.c
-          713af78bad9e27af4e4bc40decf879e4990c92ca src/room_measure.h
-          0449024abccb96c1429b9cfc2590a7659289d124 src/room_memory_probe.h
-          466acbce314ef0554df0527dae2784e1baf32c92 src/room_phone_channel.h
-          5953780458aee41ada193557ca0404bd27e9d8e6 src/room_phone_setup.h
           aabb0d77274bef6828887cb9ec380416b519306e src/room_sdk_stop.h
-          aba28c7626f4690783b3f9d9a6ad6e1482092ab9 src/room_sec2_context.h
-          61cf3382f5203ce16b943a604166dfadeca0c8c6 src/room_sec2_transport.h
-          8c5df62decaecf856ca4373baa3fb64adb4c37c3 src/room_settings.h
-          93ad85f6b486f31db93d9660354303e7da00ec4e src/room_setup_bridge.h
-          c772b3e5cdd80f50d5baa1a1c9c9e8e71bae450e src/room_setup_dispatch.h
-          6d2d1cee806f170302bad1f3c65a1f7f1301a534 src/room_setup_identity.h
-          1d6dc2d75613dbcaaf54aa8bebd92b0164eaf6fa src/room_setup_lifecycle.h
-          47d7eba0ef85d65c87ac0dcd3b8ffeb50aae436e src/room_setup_request.h
-          43cbe983c6de5120828c8f04f0df5e42fc7f4a41 src/room_wifi_enrollment.h
-          c0c5f6d82dc195a71349b925a6bbd63d6967c0f8 src/room_wifi_owner.h
-          c54bd7ee5916dbc050e4199dce58bb10d2000e06 src/room_wifi_policy.h
-          cc9dc7317de93b38ff49a5dba98af96d3c3c4385 src/sht40.c
-          d40ace0c443e6d96e7a7eaa356e491494f330395 src/sht40.h
-          a5c468c6fe7ed7988c3ac7ce9e58983af7df9d23 tests/browser_worker/completion_adapter.h
-          c73f0dd25a66edd063f30d314a40b590acebe859 tests/browser_worker/mailbox.h
-          94e8fdc7588f03854cc1607cc819ca5d0d36115d tests/browser_worker/stop_gate_adapter.h
-          b9e660cd33b41b810b119933f3ebfde551a343ae tests/browser_worker/timed_completion_adapter.h
-          a5319c72fcd169b484ffd47f2f3fb53333ac62c6 tests/browser_worker/worker_model.h
-          c229ebff360b68755bb33f33db96239365d7e215 tests/fixture_room_wifi_apsta_link.c
-          30eb1a1a6b870642c9e399f1417931851d8dbc38 tests/mock_apsta_owner/esp_netif.h
-          0da3199a2e6ac2ae0479f660fde3d65fac67194f tests/mock_apsta_owner/esp_wifi_default.h
-          eaaf20aa27a571be2222c2ec27f1175cfcc15a42 tests/mock_apsta_owner/esp_wifi.h
-          19de50011cb074cc0862762e137d4cf422c9ba87 tests/mock_combined/driver/gpio.h
-          6d38e19f7fe23091092cbcadf46d5c3f21abb740 tests/mock_events/esp_event.h
-          74b3bd0bd17918dfabd11bc79b19f00ca6573bce tests/mock_events/freertos/FreeRTOS.h
-          699efa8a0466839e530447183aa6a3ce1471b280 tests/mock_events/freertos/queue.h
-          332859b7e5b1f812367f36fe757f718026f39d40 tests/mock_events/freertos/task.h
-          9db20974949148c84b367fab0c8870dd123f2e79 tests/mock_sec2_transport/protocomm_security2.h
-          3c4d551863d2afe9001d0586bf9487f46d4a22a0 tests/mock_sec2_transport/protocomm.h
-          74ec65cf989890bf962e2a3cd2b2739e28919a10 tests/mock_task/esp_event.h
-          da7c9d67601f6ab53a66b94710b9ac0fccf24846 tests/mock_task/esp_timer.h
-          1b6cc8efcccba2a6d5cc34280ecfc5e69e260409 tests/mock_task/freertos/task.h
-          e66f1a4b77f33257bda6a3b0adbba71defb61ecd tests/test_room_apsta_events.c
-          feb57263825a447fadc3aa66439c01dd85e8b880 tests/test_room_apsta_gate_channel.c
-          76776f376ef57e9562945b33d4bfc6f17a1220e3 tests/test_room_apsta_owner.c
-          51e30e9ba3cfbc45cf29c5b5917d903e5eeec80c tests/test_room_apsta_session.c
-          a5327b64373ebdb8af5b0456d4affc54185c7c3c tests/test_room_apsta_task.c
-          936b086ed7107d7f45bd774626a7294220493569 tests/test_room_sec2_transport.c
-          0969ab9d0b4ba4d16496786bae205b6c728ced1c tests/test_room_wifi_combined.c
+          c5bd10c9b78dc8bd2f6038f1487709e593f3b6b1 tests/mock_http_backend/esp_http_server.h
+          d0f3689bc672f3b68cad45ad002737192bc11521 tests/mock_http_backend/esp_netif.h
+          e46e29ec7864ec9461b56d1d37e020877fdca159 tests/mock_http_backend/esp_timer.h
+          a77a07f280c207708f1311c1f26b0fd056775255 tests/mock_http_backend/esp_wifi.h
+          b6e3d7e68ae732740567d65ad1cf5d073c96f271 tests/mock_http_backend/freertos/FreeRTOS.h
+          0c8e6ba6955f04fd95414973fe461efe1ea1778d tests/mock_http_backend/freertos/task.h
+          8ba89c09a57a1d524c7012ebc5b4549248f6c966 tests/mock_http_backend/lwip/sockets.h
+          69998df3bdd04bb91de36fdc2baf9a8b2815b2a3 tests/mock_http_backend/room_wifi_apsta_link.h
+          d849fba41a22844925803c455e6e898096b295c5 tests/mock_http_backend/room_wifi_identity_provider.h
+          0a3cde63d7be7b318a78345a03364b6f77f6318b tests/mock_http_backend/room_wifi_idf.h
+          c4b50ad87f4905d9733cf67d827de3e882c3238f tests/mock_http_backend/room_wifi_secure_store.h
+          21ceb5a29be06373c0cbc35eca868848835be136 tests/run_room_http_backend_host.sh
+          1281e099c6d5f1b1bd2a2d9cfa52e250d19c1552 tests/test_room_http_backend.c
           MANIFEST
-          test "$(wc -l < "$work/manifest")" = 90
+          test "$(wc -l < "$work/manifest")" = 26
           while read -r expected path; do
             test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
             mkdir -p "$work/input/$(dirname "$path")"
             git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
             test "$(git hash-object "$work/input/$path")" = "$expected"
           done < "$work/manifest"
-          grep -Fq 'room_network_owner_prepare(selected_key,NULL,&status)' "$work/input/main/room_network.c"
-          echo INTEGRATED_SOURCE_SHA="$source_sha"
-          echo INTEGRATED_INPUT_BLOBS_OK=90
-      - name: Exact target build and separate inactive symbol link qualification
-        if: always() && steps.prepare.outcome == 'success'
+          echo BACKEND_SOURCE_SHA="$source_sha"
+          echo BACKEND_INPUT_BLOBS_OK=26
+      - name: Run synthetic backend fixtures on GCC and Clang
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
-          work="$RUNNER_TEMP/room-integrated-20261128"
-          image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
-          cat > "$work/input/link-probe.cmake" <<'CMAKE'
-          
-          # Test-only link retention. No startup call or real listener.
-          target_link_libraries(${COMPONENT_LIB} INTERFACE
-              "-Wl,-u,room_network_owner_prepare"
-              "-Wl,-u,room_http_backend_prepare_owner"
-              "-Wl,-u,room_http_backend_offer"
-              "-Wl,-u,room_http_backend_reply"
-              "-Wl,-u,room_http_backend_finish"
-              "-Wl,-u,room_http_idf_driver_init"
-              "-Wl,-u,room_http_idf_peer_observe"
-              "-Wl,-u,room_apsta_events_peer_attach"
-              "-Wl,-u,room_apsta_events_peer_epoch"
-              "-Wl,-u,room_wifi_apsta_link_peer_epoch"
-          )
-          CMAKE
-          cat > "$work/input/target-build.sh" <<'TARGET'
-          set -euo pipefail
-          test "$(git -C "$IDF_PATH" rev-parse HEAD)" = 051e4c4eb20346e043cdd47bc388fde75ff8af63
-          git -C "$IDF_PATH" diff --quiet
-          git -C "$IDF_PATH" diff --cached --quiet
-          git -C "$IDF_PATH" submodule status --recursive > /tmp/submodules.txt
-          if grep -q "^[+U-]" /tmp/submodules.txt; then exit 1; fi
-          sha256sum /tmp/submodules.txt
-          idf.py --version
-          riscv32-esp-elf-gcc --version
-          test "$(riscv32-esp-elf-gcc -dumpfullversion)" = 15.2.0
-          python -m pip check
-          mkdir /tmp/candidate
-          cp -R --no-preserve=ownership /input/main /input/src /input/CMakeLists.txt /input/sdkconfig.defaults /tmp/candidate/
-          cd /tmp/candidate
-          idf.py set-target esp32c3
-          idf.py build
-          grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
-          test -s build/room_sensor.elf
-          test -s build/room_sensor.bin
-          for unit in room_network_owner room_http_backend room_http_idf_driver room_http_idf_peer room_apsta_events room_wifi_apsta_link; do
-            test -s "build/esp-idf/main/CMakeFiles/__idf_main.dir/$unit.c.obj"
-            echo TARGET_OBJECT_OK="$unit"
+          work="$RUNNER_TEMP/room-backend-host"
+          cd "$work/input"
+          env -i PATH=/usr/bin:/bin HOME="$work" UBSAN_OPTIONS=halt_on_error=1 timeout 180s sh tests/run_room_http_backend_host.sh | tee "$work/backend.log"
+          for cc in gcc clang; do
+            for mode in normal clean uncertain publish abort drain deadline stop-error worker idf-normal idf-name idf-start idf-register idf-peer idf-recv idf-send idf-size idf-timeout peer-guard idf-restart idf-evidence; do
+              test "$(grep -Fxc "exit=0 $cc $mode" "$work/backend.log")" = 1
+            done
           done
-          idf.py size
-          sha256sum build/room_sensor.bin
-          echo TARGET_INTEGRATED_EXACT_BUILD_OK
-          # Separate build of a local copy to ensure otherwise unused new APIs
-          # resolve at target link time; do not modify the published candidate.
-          cat /input/link-probe.cmake >> main/CMakeLists.txt
-          idf.py build
-          grep -qx "CONFIG_ROOM_WIFI_HMAC_KEY_ID=-1" sdkconfig
-          riscv32-esp-elf-nm --defined-only build/room_sensor.elf > /tmp/symbols.txt
-          for symbol in room_network_owner_prepare room_http_backend_prepare_owner room_http_backend_offer room_http_backend_reply room_http_backend_finish room_http_idf_driver_init room_http_idf_peer_observe room_apsta_events_peer_attach room_apsta_events_peer_epoch room_wifi_apsta_link_peer_epoch; do
-            grep -E "[[:space:]][Tt][[:space:]]$symbol$" /tmp/symbols.txt
-          done
-          idf.py size
-          sha256sum build/room_sensor.bin
-          echo TARGET_INTEGRATED_LINK_PROBE_OK
-          TARGET
-          # Audited public input only. The bind mount is read-only; no group/other write.
-          chmod -R a+rX -- "$work/input"
-          test -z "$(find "$work/input" -perm /022 -print -quit)"
-          docker pull --platform linux/amd64 "$image"
-          docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}' "$image"
-          docker run --rm --platform linux/amd64 --network none --cap-drop ALL --security-opt no-new-privileges --mount "type=bind,source=$work/input,target=/input,readonly" -e IDF_COMPONENT_MANAGER=0 -e IDF_CCACHE_ENABLE=0 "$image" bash /input/target-build.sh
+          test "$(grep -c '^PASS http-backend ' "$work/backend.log")" = 42
+          test "$(grep -Fxc 'BACKEND_RESTART_WINDOWS=129' "$work/backend.log")" = 2
+          test "$(grep -Fxc 'SDK_RESTART_WINDOWS=24 successful_exchanges=48' "$work/backend.log")" = 2
+          test "$(grep -Fxc 'SDK_EVIDENCE_REJECTIONS=18' "$work/backend.log")" = 2
+          echo BACKEND_HOST_RUNS_OK=42
