@@ -1,5 +1,6 @@
 #include "room_http_idf_driver.h"
 #include "room_http_idf_peer.h"
+#include "room_socket_ipv4.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "lwip/sockets.h"
@@ -155,7 +156,34 @@ int mock_getsockname(int fd,struct sockaddr *s,socklen_t *n){return mock_endpoin
 int mock_getpeername(int fd,struct sockaddr *s,socklen_t *n){return mock_endpoint(fd,s,n,false);}
 static bool local_epoch(void *ctx,const esp_netif_t *p,const uint8_t mac[6],uint64_t *token){assert(ctx==&ap&&p==&ap&&!memcmp(mac,peer_mac,6));++evidence_epoch_reads;*token=association+(evidence_fault==15&&evidence_epoch_reads%2==0?1u:0u);return evidence_fault!=16;}
 static room_http_idf_peer peer_source={&ap,local_epoch};
+static void endpoint_lengths_case(void){
+    struct sockaddr_storage s={0};
+    struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=ap_ip;
+    memcpy(&s,&a,sizeof(a));
+    assert(room_socket_ipv4_matches(&s,sizeof(a),ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(a)-1,ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(a)+1,ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(a),peer_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(a),0));
+    struct sockaddr_in6 b={0};b.sin6_family=AF_INET6;
+    b.sin6_addr.s6_addr[10]=255;b.sin6_addr.s6_addr[11]=255;
+    memcpy(b.sin6_addr.s6_addr+12,&ap_ip,sizeof(ap_ip));
+    memset(&s,0,sizeof(s));memcpy(&s,&b,sizeof(b));
+    assert(room_socket_ipv4_matches(&s,sizeof(b),ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b)-1,ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b)+1,ap_ip));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b),peer_ip));
+    b.sin6_scope_id=1;memcpy(&s,&b,sizeof(b));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b),ap_ip));
+    b.sin6_scope_id=0;b.sin6_flowinfo=1;memcpy(&s,&b,sizeof(b));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b),ap_ip));
+    b.sin6_flowinfo=0;b.sin6_addr.s6_addr[10]=0;memcpy(&s,&b,sizeof(b));
+    assert(!room_socket_ipv4_matches(&s,sizeof(b),ap_ip));
+    assert(!room_socket_ipv4_matches(NULL,0,ap_ip));
+    puts("SDK_ENDPOINT_FORMAT_CHECKS_OK");
+}
 static void evidence_case(void){
+    endpoint_lengths_case();
     for(unsigned form=0;form<2;++form){
         evidence_mapped=form!=0;evidence_fault=0;
         room_http_peer_observation o={0};
