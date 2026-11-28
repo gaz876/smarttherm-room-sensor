@@ -1,4 +1,4 @@
-name: ESP32-C3 HTTP mailbox atomic stop gate qualification
+name: ESP32-C3 HTTP mailbox repeated HTTP transactions qualification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -15,13 +15,13 @@ jobs:
     timeout-minutes: 25
     permissions: {}
     steps:
-      - name: Build and run isolated HTTP mailbox atomic stop gate probe
+      - name: Build and run isolated HTTP mailbox repeated HTTP transactions probe
         shell: bash
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
-          source_sha=a3762d0be50f7e4ca1014cc3f3cd4d113cf77688
+          source_sha=a0c7156570f06728bc1437fc3c65abbb43f566fa
           image=docker.io/espressif/idf@sha256:e5b767c64fdfdf427aa14cc7aaa15d24caf2f22c78241c5a3ed18150cfa7f05c
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
@@ -38,7 +38,7 @@ jobs:
           739079da75a937ed1c18b7edbe831c0254249780 tests/http_mailbox_sdk_probe/CMakeLists.txt
           3b982527dccd6279d73dcb90c7ae47970739e4ed tests/http_mailbox_sdk_probe/main/CMakeLists.txt
           56c38a500be28c289abcda273ab4ac0ca78a9d81 tests/http_mailbox_sdk_probe/sdkconfig.defaults
-          24a9871a1272d3e08cee16755f98d39ad2a1fd35 tests/http_mailbox_sdk_probe/main/probe.c
+          8fd37e496a1e74ee76482833a5102b27a33e29d8 tests/http_mailbox_sdk_probe/main/probe.c
           a5319c72fcd169b484ffd47f2f3fb53333ac62c6 tests/browser_worker/worker_model.h
           c73f0dd25a66edd063f30d314a40b590acebe859 tests/browser_worker/mailbox.h
           a5c468c6fe7ed7988c3ac7ce9e58983af7df9d23 tests/browser_worker/completion_adapter.h
@@ -90,6 +90,7 @@ jobs:
             test "$rc" = 0 || test "$rc" = 124
             test "$(grep -cx HTTP_MB_GATE_RACE_PASS /tmp/qemu-clean.log)" = 1
             test "$(grep -cx HTTP_MB_GATE_PASS /tmp/qemu-clean.log)" = 1
+            test "$(grep -Ec "^HTTP_MB_REPEAT_PASS rounds=16 warm=[0-9]+ min=[0-9]+$" /tmp/qemu-clean.log)" = 1
             test "$(grep -cx "HTTP_MB_GATE_CASE 1 status=200 ack=1 result=1" /tmp/qemu-clean.log)" = 1
             test "$(grep -cx "HTTP_MB_GATE_CASE 2 status=503 ack=1 result=1" /tmp/qemu-clean.log)" = 1
             test "$(grep -cx "HTTP_MB_GATE_CASE 3 status=200 ack=0 result=1" /tmp/qemu-clean.log)" = 1
