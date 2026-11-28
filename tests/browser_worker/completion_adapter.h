@@ -49,6 +49,7 @@ static inline ack_result ack_step(ack_adapter *a,mb_event e,bool receipt,
         goto done;
     }
     if(a->ticket && e.action==MB_SUBMIT) { result=ACK_WAIT; goto done; }
+    if(m->life.owner_budget && e.action==MB_DRAINED) goto done;
     uint64_t deadline=m->life.deadline;
     mb_result rc=mb_apply(m,e,out);
     if(rc==MB_OK) {

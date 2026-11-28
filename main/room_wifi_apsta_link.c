@@ -1,4 +1,5 @@
 #include "room_wifi_apsta_link.h"
+#include "room_cleanup_budget.h"
 #include "room_wifi_secure_store.h"
 #include "esp_timer.h"
 
@@ -10,6 +11,8 @@ static struct {
     room_phone_channel channel;
     room_phone_io io;
     bool io_bound;
+    room_phone_timed_close timed_close;
+    uint64_t cleanup_deadline,cleanup_last;
     room_enroll_store store;
     room_wifi_apsta_provider provider;
     uint64_t prior_save;
@@ -60,28 +63,52 @@ static bool poll(void *ctx) {
     (void)ctx;
     return a.io_bound?room_phone_channel_poll(&a.channel):room_apsta_task_poll(&a.task);
 }
-static bool stop(void *ctx,room_wifi_setup_result *result) {
+static bool channel_clock(void *ctx,uint64_t *now) {
+    (void)ctx; int64_t us=esp_timer_get_time();
+    if (us<0) return false;
+    *now=(uint64_t)us/1000u; return true;
+}
+/* Compatibility for the existing offline backend. A real timed backend must
+ * accept the same absolute deadline via attach_io_until. */
+static bool legacy_close(void *ctx,uint64_t window,uint64_t deadline) {
+    (void)deadline;
+    return window==a.channel.window && a.io.close(ctx);
+}
+static bool link_cleanup_live(uint64_t deadline) {
+    uint64_t now=0;
+    if (a.task.session.locked || !channel_clock(NULL,&now) ||
+        !room_cleanup_check(&a.cleanup_deadline,&a.cleanup_last,now,deadline)) {
+        a.task.session.locked=true; return false;
+    }
+    return true;
+}
+static bool stop(void *ctx,uint64_t deadline,room_wifi_setup_result *result) {
     (void)ctx;
     room_apsta_session *s=&a.task.session;
-    if (!result) return false;
-    if(a.io_bound&&!room_phone_channel_close(&a.channel))return false;
+    if (!result || !link_cleanup_live(deadline)) return false;
+    if(a.io_bound){
+        bool drained=room_phone_channel_close_until(&a.channel,deadline,channel_clock,NULL,a.timed_close);
+        if(!link_cleanup_live(deadline)||!drained)return false;
+    }
     if(s->locked||s->radio.phase==APSTA_LOCKED)return false;
     if (!s->bridge.window) {
         if (s->radio.phase!=APSTA_IDLE || s->transport.bridge ||
             s->transport.pending || a.task.pending ||
             atomic_load(&a.task.events.accepting)) return false;
     } else {
-        /* Optional backend has already confirmed drain. Without a backend,
-         * never claim drain while a test/other local sender still owns reply. */
         bool drained=!s->transport.pending && !s->transport.dispatching;
-        if (!room_apsta_task_close(&a.task,drained)) return false;
+        bool done=room_apsta_task_close_until(&a.task,drained,deadline);
+        if (!link_cleanup_live(deadline)||!done) return false;
     }
+    if (!link_cleanup_live(deadline)) return false;
     const room_phone_setup *p=&s->bridge.phone;
     *result=p->enrollment.storage_uncertain?ROOM_WIFI_SETUP_UNCERTAIN:
         p->saved_generation>a.prior_save?ROOM_WIFI_SETUP_COMMITTED:ROOM_WIFI_SETUP_NO_SAVE;
     a.prior_save=p->saved_generation;
+    a.cleanup_deadline=0; a.cleanup_last=0;
     return true;
 }
+
 static bool load(void *ctx,room_enroll_profile *p) {
     (void)ctx; return room_secure_load(p)==ROOM_SEC_VALID;
 }
@@ -100,9 +127,12 @@ bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider provider) {
     return room_wifi_idf_init_missing() && room_wifi_apsta_link_bind(provider);
 }
 
-bool room_wifi_apsta_link_attach_io(room_phone_io io) {
+bool room_wifi_apsta_link_attach_io_until(room_phone_io io,room_phone_timed_close timed_close) {
     if(!room_wifi_idf_is_owner()||!a.attempted||!a.task.ready||a.io_bound||
         a.task.session.bridge.last_window||a.channel.attempted||
-        !io.open||!io.receive||!io.send||!io.close)return false;
-    a.io=io;a.io_bound=true;return true;
+        !io.open||!io.receive||!io.send||!io.close||!timed_close)return false;
+    a.io=io;a.timed_close=timed_close;a.io_bound=true;return true;
+}
+bool room_wifi_apsta_link_attach_io(room_phone_io io) {
+    return room_wifi_apsta_link_attach_io_until(io,legacy_close);
 }

@@ -1,4 +1,5 @@
 #include "room_wifi_idf.h"
+#include "room_cleanup_budget.h"
 #include "room_wifi_owner.h"
 #include "driver/gpio.h"
 #include "esp_event.h"
@@ -17,7 +18,7 @@ static struct {
     room_boot_button button;
     room_wifi_setup_io setup_io;
     TaskHandle_t task;
-    uint64_t cleanup_deadline;
+    uint64_t cleanup_deadline,cleanup_last;
     bool bind_attempted, bound, apsta, stepped, automatic;
     wifi_config_t config;
     esp_netif_t *netif;
@@ -62,16 +63,25 @@ static bool barrier(void) {
     w.posted=0;
     return true;
 }
+static bool cleanup_live(void) {
+    int64_t us=esp_timer_get_time();
+    if (us<0 || !room_cleanup_check(&w.cleanup_deadline,&w.cleanup_last,(uint64_t)us/1000u,w.cleanup_deadline)) {
+        w.fatal=true; return false;
+    }
+    return true;
+}
 static bool stop(void *ctx) {
     (void)ctx; w.session=0;
     if (w.fatal) return false;
-    uint64_t now=now_ms();
-    if (!w.cleanup_deadline) w.cleanup_deadline=wifi_deadline(now,5000u);
-    if (now>=w.cleanup_deadline) { w.fatal=true; return false; }
+    int64_t us=esp_timer_get_time();
+    if (us<0) { w.fatal=true; return false; }
+    if (!w.cleanup_deadline) w.cleanup_deadline=room_cleanup_limit((uint64_t)us/1000u);
+    if (!cleanup_live()) return false;
     if (w.apsta) {
         room_wifi_setup_result result=ROOM_WIFI_SETUP_NO_SAVE;
-        if (!w.setup_io.stop(w.setup_io.ctx,&result)) return false;
-        w.apsta=false; w.cleanup_deadline=0;
+        bool done=w.setup_io.stop(w.setup_io.ctx,w.cleanup_deadline,&result);
+        if (!cleanup_live() || !done) return false;
+        w.apsta=false; w.cleanup_deadline=0; w.cleanup_last=0;
         /* Completion is reconciled only after radio and transport teardown.
          * A verified write survives loss of the final response or timeout.
          * No saved profile is inferred merely from closing the setup window. */
@@ -91,29 +101,39 @@ static bool stop(void *ctx) {
         return true;
     }
     if (w.clean==CLEAN_NONE) {
-        if (w.attempted && esp_wifi_stop()!=ESP_OK) return false;
+        /* No SDK guarantee of retry safety after an ambiguous stop. */
+        if (w.attempted && esp_wifi_stop()!=ESP_OK) { w.fatal=true; return false; }
         w.attempted=false; w.clean=CLEAN_STOPPED;
+        if (!cleanup_live()) return false;
     }
     if (w.clean==CLEAN_STOPPED) {
-        if (!barrier()) return false;
+        bool ready=barrier();
+        if (!cleanup_live() || !ready) return false;
         if (w.netif) {
             if (esp_netif_is_netif_up(w.netif)) return false;
+            if (!cleanup_live()) return false;
             /* The SDK clear function can detach even on error; never repeat an
              * ambiguous detach, never reuse that interface. */
             if (esp_wifi_clear_default_wifi_driver_and_handlers(w.netif)!=ESP_OK) { w.fatal=true; return false; }
+            if (!cleanup_live()) return false;
             esp_netif_destroy(w.netif); w.netif=NULL;
+            if (!cleanup_live()) return false;
         }
         w.clean=CLEAN_DETACHED;
     }
     if (w.clean==CLEAN_DETACHED) {
-        if (w.driver && esp_wifi_deinit()!=ESP_OK) return false;
+        if (w.driver && esp_wifi_deinit()!=ESP_OK) { w.fatal=true; return false; }
         w.driver=false; w.clean=CLEAN_DEINIT;
+        if (!cleanup_live()) return false;
     }
-    if (!barrier()) return false;
-    w.clean=CLEAN_NONE; w.cleanup_deadline=0;
+    bool ready=barrier();
+    if (!cleanup_live() || !ready) return false;
     if (w.bound) enroll_wipe(&w.config,sizeof(w.config));
+    if (!cleanup_live()) return false;
+    w.clean=CLEAN_NONE; w.cleanup_deadline=0; w.cleanup_last=0;
     return true;
 }
+
 static void configure(const uint8_t *ssid,size_t n,const uint8_t *pass,size_t m) {
     enroll_wipe(&w.config,sizeof(w.config));
     memcpy(w.config.sta.ssid,ssid,n); memcpy(w.config.sta.password,pass,m);

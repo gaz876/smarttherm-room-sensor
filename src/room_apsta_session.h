@@ -13,7 +13,7 @@ typedef struct {
     room_setup_clock clock;
     void *ctx;
     uint32_t lease;
-    uint64_t cleanup_deadline;
+    uint64_t cleanup_deadline, cleanup_last;
     bool locked;
 } room_apsta_session;
 /* Owner supplies only queued SDK events, not client data. Lost events or
@@ -30,4 +30,6 @@ bool room_apsta_session_open(room_apsta_session *, room_setup_clock, void *,
  * process all queued events. Actual sender owns pending buffer until finish. */
 bool room_apsta_session_step(room_apsta_session *, bool events_drained);
 bool room_apsta_session_close(room_apsta_session *, bool, room_apsta_barrier, void *);
+/* Owner supplies the unchanged outer absolute deadline. */
+bool room_apsta_session_close_until(room_apsta_session *, bool, room_apsta_barrier, void *, uint64_t);
 #endif

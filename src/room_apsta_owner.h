@@ -76,9 +76,15 @@ static inline bool room_apsta_link(const room_apsta_owner *o,uint64_t window,uin
  * A false return may mean pending or permanent lockout; inspect phase.
  * Never retry ambiguous SDK detach/stop/deinit. Owner must enforce outer
  * deadline and require controlled recovery for a permanently locked radio. */
-static inline bool room_apsta_stop(room_apsta_owner *o,uint64_t window,bool transport_drained,
-    room_apsta_barrier barrier,void *ctx) {
+typedef bool (*room_apsta_guard)(void *);
+static inline bool room_apsta_guard_ok(room_apsta_owner *o,room_apsta_guard guard,void *ctx) {
+    if (!guard || guard(ctx)) return true;
+    o->phase=APSTA_LOCKED; return false;
+}
+static inline bool room_apsta_stop_guarded(room_apsta_owner *o,uint64_t window,bool transport_drained,
+    room_apsta_barrier barrier,void *ctx,room_apsta_guard guard,void *guard_ctx) {
     if (!o || !window || window!=o->window || o->phase==APSTA_IDLE || o->phase==APSTA_LOCKED) return false;
+    if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
     if (o->phase==APSTA_RUNNING) o->phase=APSTA_STOP;
     if (!transport_drained || !barrier) return false;
     if (o->phase==APSTA_STOP) {
@@ -86,23 +92,36 @@ static inline bool room_apsta_stop(room_apsta_owner *o,uint64_t window,bool tran
         o->attempted=false;
         if (o->uncertain) { o->phase=APSTA_LOCKED; return false; }
         o->phase=APSTA_DRAIN;
+        if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
     }
     if (o->phase==APSTA_DRAIN) {
-        if (!barrier(ctx,window,false) || (o->ap && esp_netif_is_netif_up(o->ap)) ||
-            (o->sta && esp_netif_is_netif_up(o->sta))) return false;
+        bool ready=barrier(ctx,window,false);
+        if (!room_apsta_guard_ok(o,guard,guard_ctx) || !ready) return false;
+        if ((o->ap && esp_netif_is_netif_up(o->ap)) || (o->sta && esp_netif_is_netif_up(o->sta))) return false;
+        if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
         if (o->sta) {
             if (o->sta_attached && esp_wifi_clear_default_wifi_driver_and_handlers(o->sta)!=ESP_OK) { o->phase=APSTA_LOCKED; return false; }
+            if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
             esp_netif_destroy(o->sta); o->sta=NULL;
+            if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
         }
         if (o->ap) {
             if (o->ap_attached && esp_wifi_clear_default_wifi_driver_and_handlers(o->ap)!=ESP_OK) { o->phase=APSTA_LOCKED; return false; }
+            if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
             esp_netif_destroy(o->ap); o->ap=NULL;
+            if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
         }
         if (o->driver && esp_wifi_deinit()!=ESP_OK) { o->phase=APSTA_LOCKED; return false; }
         o->driver=false; o->phase=APSTA_FINAL_DRAIN;
+        if (!room_apsta_guard_ok(o,guard,guard_ctx)) return false;
     }
-    if (!barrier(ctx,window,true)) return false;
+    bool ready=barrier(ctx,window,true);
+    if (!room_apsta_guard_ok(o,guard,guard_ctx) || !ready) return false;
     uint64_t last=o->last_window;
     *o=(room_apsta_owner){.last_window=last}; return true;
+}
+static inline bool room_apsta_stop(room_apsta_owner *o,uint64_t window,bool transport_drained,
+    room_apsta_barrier barrier,void *ctx) {
+    return room_apsta_stop_guarded(o,window,transport_drained,barrier,ctx,NULL,NULL);
 }
 #endif

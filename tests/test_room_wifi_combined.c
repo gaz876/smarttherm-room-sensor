@@ -277,9 +277,70 @@ static int first_boot(const char *scenario) {
     deliver();assert(!tick(end+10300)&&!driver&&!sta_starts&&!posted);
     puts("PASS first boot window and manual-only reopen");return 0;
 }
+static uint64_t close_deadline;
+static bool late_return;
+static bool timed_close(void *ctx,uint64_t window,uint64_t deadline) {
+    assert(window==1&&ms<deadline);
+    if(!close_deadline)close_deadline=deadline;
+    assert(deadline==close_deadline);
+    bool done=io_close(ctx);
+    if(done&&late_return)ms=deadline;
+    return done;
+}
+static int combined_deadline(const char *scenario) {
+    storage.saved=(room_enroll_profile){.ssid_len=4,.pass_len=8,.ssid={'h','o','m','e'},.pass={'t','e','s','t','o','n','l','y'}};
+    assert(room_wifi_idf_init(storage.saved.ssid,4,storage.saved.pass,8));
+    room_wifi_apsta_provider p={&storage,provider_ready,provider_prepare};
+    assert(room_wifi_apsta_link_bind(p));
+    room_phone_io io={NULL,io_open,io_receive,io_send,io_close};
+    assert(room_wifi_apsta_link_attach_io_until(io,timed_close));
+    assert(!tick(0)&&sta_starts==1);online(50);
+    button=true;assert(tick(100));assert(tick(150));
+    assert(!tick(3150)&&posted&&stops==1);deliver();
+    assert(!tick(4150)&&posted&&!driver);deliver();
+    io_fail_open=!strcmp(scenario,"partial");
+    assert(!tick(5150)&&ap_starts==1&&io_opens==1);
+    if(io_fail_open){
+        assert(close_deadline==10150&&io_closes==1&&posted&&stops==2);deliver();
+        assert(!tick(6150)&&posted&&!driver);deliver();
+        assert(!tick(7150)&&sta_starts==2&&io_closes==1&&fixture_identity_cleared());
+        puts("PASS timed partial open drains exactly once");return 0;
+    }
+    const uint8_t hs[]={1};io_input=hs;io_len=sizeof hs;io_handshake=true;io_pending=true;
+    assert(!tick(5200)&&io_reads==1&&!io_writes);
+    io_wait_close=true;disconnect_event();
+    assert(!tick(5300)&&close_deadline==10300&&io_closes==1&&stops==1&&driver&&!posted);
+    assert(!tick(6300)&&io_closes==2&&stops==1&&driver);
+    io_wait_close=false;
+    if(!strcmp(scenario,"wait-expired")){
+        assert(!tick(10300)&&io_closes==2&&stops==1&&driver&&!posted);
+        assert(!tick(11300)&&sta_starts==1&&io_closes==2&&stops==1);
+        puts("PASS expiry prevents a new timed backend call");return 0;
+    }
+    if(!strcmp(scenario,"late-return")){
+        late_return=true;assert(!tick(7300)&&ms==10300&&io_closes==3&&stops==1&&driver&&!posted);
+        assert(!tick(11300)&&sta_starts==1&&io_closes==3&&stops==1);
+        puts("PASS late backend return cannot initiate radio cleanup");return 0;
+    }
+    bool late_barrier=!strcmp(scenario,"late-barrier");
+    assert(late_barrier||!strcmp(scenario,"success"));
+    uint64_t drained=late_barrier?8300:7300;
+    assert(!tick(drained)&&io_closes==3&&posted&&stops==2);deliver();
+    assert(!tick(drained+1000)&&posted&&!driver&&sta_starts==1);deliver();
+    assert(!tick(drained+2000)&&io_closes==3);
+    if(late_barrier){
+        assert(sta_starts==1&&!driver&&!fixture_identity_cleared());
+        assert(!tick(11300)&&sta_starts==1&&io_closes==3);
+        puts("PASS late final barrier cannot grant handoff");return 0;
+    }
+    assert(sta_starts==2&&driver&&fixture_identity_cleared());
+    online(drained+2050);puts("PASS one deadline through full timed channel and radio chain");return 0;
+}
+
 int main(int argc,char **argv){
     const char *scenario=argc>1?argv[1]:"normal";
     storage.saved=(room_enroll_profile){.ssid_len=4,.pass_len=8,.ssid={'h','o','m','e'},.pass={'t','e','s','t','o','n','l','y'}};
+    if(!strncmp(scenario,"timed_",6))return combined_deadline(scenario+6);
     if(!strncmp(scenario,"channel_",8))return channel_case(scenario);
     if(!strncmp(scenario,"save_",5))return first_save(scenario);
     if(!strncmp(scenario,"first_",6))return first_boot(scenario);

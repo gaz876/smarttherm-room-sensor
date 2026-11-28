@@ -2,7 +2,7 @@
 #include "esp_timer.h"
 
 ESP_EVENT_DEFINE_BASE(ROOM_APSTA_BARRIER);
-static uint64_t clock_ms(void *ctx) { (void)ctx; return (uint64_t)(esp_timer_get_time()/1000); }
+static uint64_t clock_ms(void *ctx) { (void)ctx; int64_t us=esp_timer_get_time(); return us<0?UINT64_MAX:(uint64_t)us/1000u; }
 static bool owned(const room_apsta_task *t) {
     return t && t->ready && !t->failed && t->owner==xTaskGetCurrentTaskHandle();
 }
@@ -89,5 +89,18 @@ bool room_apsta_task_close(room_apsta_task *t,bool sender_drained) {
     if (!owned(t)) return false;
     bool ok=room_apsta_session_close(&t->session,sender_drained,barrier,t);
     if (ok) room_apsta_events_end(&t->events);
+    return ok;
+}
+
+bool room_apsta_task_close_until(room_apsta_task *t,bool sender_drained,uint64_t deadline) {
+    if (!owned(t)) return false;
+    bool ok=room_apsta_session_close_until(&t->session,sender_drained,barrier,t,deadline);
+    if (ok) {
+        uint64_t before=clock_ms(t);
+        if (before>=deadline) { t->session.locked=true; return false; }
+        room_apsta_events_end(&t->events);
+        uint64_t after=clock_ms(t);
+        if (after<before || after>=deadline) { t->session.locked=true; return false; }
+    }
     return ok;
 }

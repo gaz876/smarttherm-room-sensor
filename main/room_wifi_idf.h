@@ -19,7 +19,8 @@ typedef struct {
     bool (*start)(void *,uint64_t deadline,room_wifi_profile,bool physical_boot);
     bool (*poll)(void *);
     /* Report outcome only after confirmed full cleanup; never from a packet. */
-    bool (*stop)(void *,room_wifi_setup_result *);
+    /* Absolute deadline belongs to the owner; it must never be extended. */
+    bool (*stop)(void *,uint64_t deadline,room_wifi_setup_result *);
     bool (*load)(void *,room_enroll_profile *);
 } room_wifi_setup_io;
 bool room_wifi_idf_is_owner(void);

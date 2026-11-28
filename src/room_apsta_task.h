@@ -29,4 +29,5 @@ bool room_apsta_task_poll(room_apsta_task *);
 bool room_apsta_task_packet(room_apsta_task *,bool,const uint8_t *,size_t,const uint8_t **,size_t *);
 bool room_apsta_task_sent(room_apsta_task *,bool);
 bool room_apsta_task_close(room_apsta_task *,bool);
+bool room_apsta_task_close_until(room_apsta_task *,bool,uint64_t);
 #endif
