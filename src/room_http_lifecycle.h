@@ -4,7 +4,9 @@
 #include "room_sdk_stop.h"
 #include "esp_timer.h"
 
-/* Inactive single-window adapter. Boot-lifetime storage; never reuse or move.
+/* Inactive single-window adapter. Never reuse or move a live context.
+ * A new logical lifetime in the same storage is permitted only after DONE
+ * (all callbacks and borrowed pointers retired) or proven unstarted CANCELLED.
  * Prepare before registering callbacks. All application accesses to SDK
  * requests, including async completion, and borrowed buffers need a lease.
  * Denied callbacks must return without touching application resources.

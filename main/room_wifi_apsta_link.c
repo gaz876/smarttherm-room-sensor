@@ -56,13 +56,24 @@ static bool start(void *ctx,uint64_t deadline,room_wifi_profile profile,bool phy
     enroll_wipe(&p,sizeof(p));
     if (ok && a.task.session.bridge.phone.deadline>deadline)
         a.task.session.bridge.phone.deadline=deadline;
-    if(ok && a.io_bound)ok=room_phone_channel_open(&a.channel,&a.task,a.io);
+    if(ok && a.io_bound) {
+        ok=room_apsta_events_peer_attach(&a.task.events,a.task.session.radio.ap);
+        if(ok)ok=room_phone_channel_open(&a.channel,&a.task,a.io);
+    }
     return ok;
 }
 static bool poll(void *ctx) {
     (void)ctx;
+    if(a.io_bound && room_apsta_events_peer_fault(&a.task.events)) return false;
     return a.io_bound?room_phone_channel_poll(&a.channel):room_apsta_task_poll(&a.task);
 }
+/* Callback reads only the event source's synchronized snapshot. It never
+ * accesses owner-only radio/session fields or dereferences an old netif. */
+bool room_wifi_apsta_link_peer_epoch(void *ctx,const esp_netif_t *ap,const uint8_t mac[6],uint64_t *out) {
+    (void)ctx;
+    return room_apsta_events_peer_epoch(&a.task.events,ap,mac,out);
+}
+
 static bool channel_clock(void *ctx,uint64_t *now) {
     (void)ctx; int64_t us=esp_timer_get_time();
     if (us<0) return false;
@@ -85,6 +96,7 @@ static bool link_cleanup_live(uint64_t deadline) {
 static bool stop(void *ctx,uint64_t deadline,room_wifi_setup_result *result) {
     (void)ctx;
     room_apsta_session *s=&a.task.session;
+    if(a.io_bound) room_apsta_events_peer_detach(&a.task.events);
     if (!result || !link_cleanup_live(deadline)) return false;
     if(a.io_bound){
         bool drained=room_phone_channel_close_until(&a.channel,deadline,channel_clock,NULL,a.timed_close);

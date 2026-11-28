@@ -44,7 +44,8 @@ static bool room_sec2_transport_destroy(room_sec2_transport *t,bool drained){CHE
 #define cleanup_live session_cleanup_live
 #include "session.inc"
 #undef cleanup_live
-typedef struct {atomic_bool accepting;} event_state;
+typedef struct {atomic_bool accepting;bool peer_revoked;} event_state;
+static void room_apsta_events_peer_detach(event_state *e){e->peer_revoked=true;}
 typedef struct {room_apsta_session session;event_state events;void *owner;unsigned pending;bool ready,failed;} room_apsta_task;
 static int owner_id;
 static void *xTaskGetCurrentTaskHandle(void){return &owner_id;}
@@ -74,7 +75,7 @@ static struct {uint64_t session,cleanup_deadline,cleanup_last;bool fatal,apsta,a
 #define barrier outer_barrier
 #include "outer.inc"
 #undef barrier
-static bool backend_close(void *v,uint64_t window,uint64_t deadline){(void)v;CHECK(window==7&&deadline==5100);++backend;delay(BACKEND);return backend_ready;}
+static bool backend_close(void *v,uint64_t window,uint64_t deadline){(void)v;CHECK(window==7&&deadline==5100&&a.task.events.peer_revoked);++backend;delay(BACKEND);return backend_ready;}
 static bool legacy_backend(void *v){(void)v;return false;}
 static bool no_io(void){return false;}
 static void reset(bool partial){

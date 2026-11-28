@@ -30,4 +30,7 @@ bool room_wifi_apsta_link_attach_io_until(room_phone_io,room_phone_timed_close);
 /* Optional first-boot candidate. Protected store must already be initialized;
  * a missing record is checked independently of the caller. No default call. */
 bool room_wifi_apsta_link_init_missing(room_wifi_apsta_provider);
+/* Local evidence callback for the optional HTTP peer observer. Still requires
+ * target ordering and interface qualification; never an authentication API. */
+bool room_wifi_apsta_link_peer_epoch(void *,const esp_netif_t *,const uint8_t [6],uint64_t *);
 #endif

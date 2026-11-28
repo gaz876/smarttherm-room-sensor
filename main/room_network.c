@@ -1,6 +1,5 @@
 #include "room_network.h"
-#include "room_wifi_secure_store.h"
-#include "room_wifi_idf.h"
+#include "room_network_owner.h"
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -12,12 +11,9 @@ static bool launched;
 static unsigned selected_key;
 static void network_task(void *arg) {
     (void)arg;
-    room_enroll_profile p={0};
-    room_secure_status status=ROOM_SEC_UNAVAILABLE;
-    if (room_secure_init(selected_key)) status=room_secure_load(&p);
-    bool station=false;
-    if (status==ROOM_SEC_VALID) station=room_wifi_idf_init(p.ssid,p.ssid_len,p.pass,p.pass_len);
-    enroll_wipe(&p,sizeof(p));
+    room_secure_status status;
+    /* No qualified HTTP backend is available in the normal build yet. */
+    bool station=room_network_owner_prepare(selected_key,NULL,&status);
     ESP_LOGI("room_network","Storage status=%d; station initialized=%d",(int)status,(int)station);
     /* Missing/corrupt profile is not authorization to open an AP. */
     if (!station) { vTaskDelete(NULL); return; }

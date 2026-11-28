@@ -19,4 +19,9 @@ typedef union {
 int esp_wifi_set_storage(wifi_storage_t);
 int esp_wifi_set_mode(wifi_mode_t);
 int esp_wifi_set_config(wifi_interface_t,wifi_config_t *);
+#define WIFI_EVENT_AP_START 10
+#define WIFI_EVENT_AP_STOP 11
+#define WIFI_EVENT_AP_STACONNECTED 12
+#define WIFI_EVENT_AP_STADISCONNECTED 13
+typedef struct { uint8_t mac[6],aid; bool is_mesh_child; } wifi_event_ap_staconnected_t;
 #endif

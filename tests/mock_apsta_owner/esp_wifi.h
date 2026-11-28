@@ -28,4 +28,9 @@ int esp_wifi_stop(void);
 int esp_wifi_deinit(void);
 int esp_wifi_connect(void);
 int esp_wifi_sta_get_ap_info(wifi_ap_record_t *);
+#define WIFI_EVENT_AP_START 10
+#define WIFI_EVENT_AP_STOP 11
+#define WIFI_EVENT_AP_STACONNECTED 12
+#define WIFI_EVENT_AP_STADISCONNECTED 13
+typedef struct { uint8_t mac[6],aid; bool is_mesh_child; } wifi_event_ap_staconnected_t;
 #endif
