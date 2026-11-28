@@ -1,0 +1,63 @@
+name: Offline MQTT sample host tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths: ['.github/workflows/admission-target.yml']
+permissions: {}
+concurrency:
+  group: admission-target-20261127
+  cancel-in-progress: true
+jobs:
+  host:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/admission-target-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Fetch immutable public test inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          unset GH_TOKEN GITHUB_TOKEN
+          export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
+          source_sha=f3635f85879bbc6d923af535b56ab8cabb5a670d
+          work="$RUNNER_TEMP/room-mqtt-sample"
+          mkdir "$work" "$work/input"
+          git init -q "$work/repo"
+          git -C "$work/repo" -c credential.helper= -c core.hooksPath=/dev/null fetch --no-tags --depth=1 https://github.com/gaz876/smarttherm-room-sensor.git "$source_sha"
+          test "$(git -C "$work/repo" rev-parse FETCH_HEAD)" = "$source_sha"
+          cat > "$work/manifest" <<'MANIFEST'
+          8296297daaeb3c803fdaef07c5f06b79adc23aaa src/room_measure.c
+          713af78bad9e27af4e4bc40decf879e4990c92ca src/room_measure.h
+          cc9dc7317de93b38ff49a5dba98af96d3c3c4385 src/sht40.c
+          d40ace0c443e6d96e7a7eaa356e491494f330395 src/sht40.h
+          afbf55b1e55fd256d2b074911098a3f3c079c70a src/room_mqtt_sample.c
+          1f1cf5b0bcaf889daa5c2b0c24f80d73fe06ae3e src/room_mqtt_sample.h
+          531448d6e38b355e6b95563bc9aa34111420cf13 tests/test_room_mqtt_sample.c
+          MANIFEST
+          test "$(wc -l < "$work/manifest")" = 7
+          while read -r expected path; do
+            test "$(git -C "$work/repo" rev-parse "$source_sha:$path")" = "$expected"
+            mkdir -p "$work/input/$(dirname "$path")"
+            git -C "$work/repo" show "$source_sha:$path" > "$work/input/$path"
+            test "$(git hash-object "$work/input/$path")" = "$expected"
+          done < "$work/manifest"
+          echo MQTT_SAMPLE_SOURCE_SHA="$source_sha"
+          echo MQTT_SAMPLE_INPUT_BLOBS_OK=7
+      - name: Execute offline sample tests on GCC and Clang
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN
+          work="$RUNNER_TEMP/room-mqtt-sample"
+          cd "$work/input"
+          for cc in gcc clang; do
+            "$cc" --version | head -n 1
+            env -i PATH=/usr/bin:/bin HOME="$work" "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -no-pie -Isrc src/room_measure.c src/sht40.c src/room_mqtt_sample.c tests/test_room_mqtt_sample.c -lm -o "$work/test-$cc"
+            env -i PATH=/usr/bin:/bin HOME="$work" ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 timeout 15s "$work/test-$cc" | tee "$work/$cc.log"
+            test "$(grep -Fxc MQTT_SAMPLE_OFFLINE_PASS "$work/$cc.log")" = 1
+            echo MQTT_SAMPLE_COMPILER_OK="$cc"
+          done
+          echo MQTT_SAMPLE_HOST_RUNS_OK=2
