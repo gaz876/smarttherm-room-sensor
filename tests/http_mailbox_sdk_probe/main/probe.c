@@ -8,6 +8,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "lwip/sockets.h"
@@ -21,9 +22,11 @@
  * only the observed SDK stop result authorizes mailbox reuse. */
 #define CHECK(x) do { if(!(x)){printf("HTTP_MB_GATE_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
 typedef enum { NORMAL, APP_ERROR, CLOSE_PENDING, LATE } mode;
+enum { REPEAT_ROUNDS=16 };
 typedef struct {
     room_http_lifecycle life;
-    room_http_async async;
+    room_http_async async[REPEAT_ROUNDS];
+    unsigned round;
     room_lease transit;
     stop_gate_adapter box;
     SemaphoreHandle_t submitted, published, sent, allow_complete, completed;
@@ -52,7 +55,7 @@ static esp_err_t uri_handler(httpd_req_t *request){
     f->claimed=true;CHECK(request->content_len==sizeof body);
     size_t used=0;while(used<sizeof body){int n=httpd_req_recv(request,(char *)body+used,sizeof body-used);CHECK(n>0&&(size_t)n<=sizeof body-used);used+=(size_t)n;}
     CHECK(room_http_enter(&f->life,f->window,&f->transit));
-    CHECK(room_http_async_begin(&f->async,&f->life,f->window,&cb,request));
+    CHECK(room_http_async_begin(&f->async[f->round],&f->life,f->window,&cb,request));
     CHECK(event(f,(mb_event){.action=MB_SUBMIT,.input=body,.size=sizeof body},false,&out)==ACK_OK);
     f->ticket=out.ticket;wipe(body,sizeof body);
     /* Server task outranks the owner/responder on this single core; no
@@ -63,10 +66,10 @@ static void responder(void *ctx){
     fixture *f=ctx;mb_reply out;char body[32]={0};take(f->published);
     CHECK(event(f,(mb_event){.action=MB_TAKE_REPLY,.ticket=f->ticket,.output=(uint8_t *)body,.size=sizeof body},false,&out)==ACK_OK);
     CHECK(out.length==strlen(response(f))&&memcmp(body,response(f),out.length)==0);
-    if(f->test==APP_ERROR)CHECK(httpd_resp_set_status(f->async.request,"503 Service Unavailable")==ESP_OK);
-    CHECK(httpd_resp_send(f->async.request,body,(ssize_t)out.length)==ESP_OK);
+    if(f->test==APP_ERROR)CHECK(httpd_resp_set_status(f->async[f->round].request,"503 Service Unavailable")==ESP_OK);
+    CHECK(httpd_resp_send(f->async[f->round].request,body,(ssize_t)out.length)==ESP_OK);
     wipe(body,sizeof body);give(f->sent);take(f->allow_complete);
-    CHECK(room_http_async_complete(&f->async));CHECK(!room_http_async_complete(&f->async));
+    CHECK(room_http_async_complete(&f->async[f->round]));CHECK(!room_http_async_complete(&f->async[f->round]));
     give(f->completed);take(f->allow_ack);
     bool closing=f->test==CLOSE_PENDING||f->test==LATE;
     CHECK(event(f,(mb_event){.action=MB_SENT,.ticket=f->ticket,.flag=true},false,&out)==(closing?ACK_REJECT:ACK_OK));
@@ -80,7 +83,8 @@ static void client(void *ctx){
     struct sockaddr_in address={.sin_family=AF_INET,.sin_port=htons(f->port)};
     CHECK(inet_pton(AF_INET,"127.0.0.1",&address.sin_addr)==1);
     CHECK(connect(fd,(struct sockaddr *)&address,sizeof address)==0);
-    static const char req[]="POST /probe HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 3\r\n\r\nABC";
+    char req[]="POST /probe HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 3\r\n\r\nABC";
+    req[sizeof(req)-2]=(char)('A'+f->round);
     size_t sent=0;while(sent<sizeof(req)-1){ssize_t n=send(fd,req+sent,sizeof(req)-1-sent,0);CHECK(n>0);sent+=(size_t)n;}
     char buf[512]={0};size_t used=0;
     while(!strstr(buf,response(f))){CHECK(used<sizeof(buf)-1);ssize_t n=recv(fd,buf+used,sizeof(buf)-1-used,0);CHECK(n>0);used+=(size_t)n;buf[used]='\0';}
@@ -103,18 +107,24 @@ static void scenario(fixture *f,unsigned w,mode m){
     room_lease owner_lease={0};CHECK(room_http_enter(&f->life,w,&owner_lease));
     httpd_uri_t uri={.uri="/probe",.method=HTTP_POST,.handler=uri_handler,.user_ctx=f};
     CHECK(httpd_register_uri_handler(server,&uri)==ESP_OK);
+    unsigned rounds=m==NORMAL?REPEAT_ROUNDS:1u;
+    size_t heap_warm=0,heap_min=SIZE_MAX;
+    uint64_t deadline=0;bool closing=m==CLOSE_PENDING||m==LATE;
+    for(unsigned i=0;i<rounds;i++){
+    f->round=i;f->claimed=false;
     CHECK(xTaskCreate(responder,"mb_response",4096,f,3,NULL)==pdPASS);
     CHECK(xTaskCreate(client,"mb_client",4096,f,3,NULL)==pdPASS);
     take(f->submitted);mb_reply out;uint8_t request[3]={0};char reply[32]={0};
     CHECK(event(f,(mb_event){.action=MB_TAKE_REQUEST,.ticket=f->ticket,.output=request,.size=sizeof request},false,&out)==ACK_OK);
-    CHECK(out.length==3&&memcmp(request,"ABC",3)==0);wipe(request,sizeof request);
+    CHECK(out.length==3&&request[0]=='A'&&request[1]=='B'&&request[2]==(uint8_t)('A'+i));
+    CHECK(f->ticket==(uint64_t)i+1u);wipe(request,sizeof request);
     CHECK(event(f,(mb_event){.action=MB_TAKE_REQUEST,.ticket=f->ticket,.output=request,.size=sizeof request},false,&out)==ACK_REJECT);
     size_t n=strlen(response(f));memcpy(reply,response(f),n);
     CHECK(event(f,(mb_event){.action=MB_PUBLISH,.ticket=f->ticket,.input=(const uint8_t *)reply,.size=n},false,&out)==ACK_OK);
     wipe(reply,sizeof reply);give(f->published);take(f->sent);take(f->client_read);
     CHECK(poll_receipt(f,&out)==ACK_WAIT&&out.ticket==0);
     uint8_t extra=1;CHECK(event(f,(mb_event){.action=MB_SUBMIT,.input=&extra,.size=1},false,&out)==ACK_REJECT);
-    uint64_t deadline=now()+(m==LATE?300u:(m==CLOSE_PENDING?4500u:1500u));bool closing=m==CLOSE_PENDING||m==LATE;
+    deadline=now()+(m==LATE?300u:(m==CLOSE_PENDING?4500u:1500u));
     if(closing){CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
         CHECK(f->box.inner.box.life.stop_deadline==deadline);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
         CHECK(!room_admission_drained(&f->life.gate,w));CHECK(simple(f,MB_DRAINED,true,true)==ACK_REJECT);
@@ -132,6 +142,20 @@ static void scenario(fixture *f,unsigned w,mode m){
     if(!closing){CHECK(poll_receipt(f,&out)==ACK_OK&&out.ticket==f->ticket);CHECK(poll_receipt(f,&out)==ACK_REJECT);}
     else CHECK(poll_receipt(f,&out)==ACK_REJECT);
     give(f->allow_client_close);take(f->client_done);
+    CHECK(f->async[i].state==ROOM_ASYNC_DONE&&!f->async[i].request&&!f->async[i].lease.gate&&!f->transit.gate);
+    if(m==NORMAL){
+        vTaskDelay(2);
+        CHECK(heap_caps_check_integrity_all(true));
+        size_t free_bytes=heap_caps_get_free_size(MALLOC_CAP_8BIT);
+        if(i==3)heap_warm=free_bytes;
+        if(i>=3&&free_bytes<heap_min)heap_min=free_bytes;
+    }
+    }
+    if(m==NORMAL){
+        CHECK(heap_warm&&heap_min&&heap_min<=heap_warm&&heap_warm-heap_min<=16384u);
+        printf("HTTP_MB_REPEAT_PASS rounds=%u warm=%u min=%u\n",rounds,(unsigned)heap_warm,(unsigned)heap_min);fflush(stdout);
+        deadline=now()+1500u;
+    }
     if(!closing){CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);}
     CHECK(room_admission_leave(&owner_lease));
     room_sdk_stop_result rc=room_http_close(&f->life,w,deadline);
