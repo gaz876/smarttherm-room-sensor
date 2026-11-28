@@ -13,19 +13,19 @@
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "room_http_async.h"
-#include "timed_completion_adapter.h"
+#include "stop_gate_adapter.h"
 
 /* Isolated QEMU probe. One synthetic request at a time, trusted local IDs.
  * No Wi-Fi driver, external interface, credentials or configuration writes.
  * One owner cleanup deadline covers mailbox and actual HTTP SDK stop;
  * only the observed SDK stop result authorizes mailbox reuse. */
-#define CHECK(x) do { if(!(x)){printf("HTTP_MB_BUDGET_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
+#define CHECK(x) do { if(!(x)){printf("HTTP_MB_GATE_FAIL line=%d\n",__LINE__);fflush(stdout);abort();} } while(0)
 typedef enum { NORMAL, APP_ERROR, CLOSE_PENDING, LATE } mode;
 typedef struct {
     room_http_lifecycle life;
     room_http_async async;
     room_lease transit;
-    ack_adapter box;
+    stop_gate_adapter box;
     SemaphoreHandle_t submitted, published, sent, allow_complete, completed;
     SemaphoreHandle_t allow_ack, responder_done, client_read, allow_client_close, client_done;
     uint64_t window, ticket;
@@ -41,7 +41,7 @@ static bool read_clock(void *ctx,uint64_t *ms){(void)ctx;*ms=now();return true;}
 static void take(SemaphoreHandle_t s){CHECK(xSemaphoreTake(s,pdMS_TO_TICKS(4000))==pdTRUE);}
 static void give(SemaphoreHandle_t s){CHECK(xSemaphoreGive(s)==pdTRUE);}
 static void wipe(void *p,size_t n){volatile uint8_t *b=p;while(n--)*b++=0;}
-static ack_result event(fixture *f,mb_event e,bool receipt,mb_reply *out){e.window=f->window;return ack_step(&f->box,e,receipt,out,read_clock,NULL);}
+static ack_result event(fixture *f,mb_event e,bool receipt,mb_reply *out){e.window=f->window;return gate_step(&f->box,e,receipt,out,read_clock,NULL);}
 static ack_result poll_receipt(fixture *f,mb_reply *out){return event(f,(mb_event){.ticket=f->ticket},true,out);}
 static ack_result simple(fixture *f,mb_action a,bool flag,bool drained){mb_reply out;return event(f,(mb_event){.action=a,.flag=flag,.drained=drained},false,&out);}
 static const char *response(const fixture *f){return f->test==APP_ERROR?"PROBE_APP_ERROR":"PROBE_OK";}
@@ -88,7 +88,7 @@ static void client(void *ctx){
     give(f->client_read);take(f->allow_client_close);CHECK(close(fd)==0);give(f->client_done);vTaskDelete(NULL);
 }
 static void scenario(fixture *f,unsigned w,mode m){
-    f->window=w;f->port=(uint16_t)(18080u+2u*w);f->test=m;ack_init_owner_budget(&f->box);
+    f->window=w;f->port=(uint16_t)(18080u+2u*w);f->test=m;gate_init(&f->box);
     f->submitted=xSemaphoreCreateBinary();f->published=xSemaphoreCreateBinary();f->sent=xSemaphoreCreateBinary();
     f->allow_complete=xSemaphoreCreateBinary();f->completed=xSemaphoreCreateBinary();f->allow_ack=xSemaphoreCreateBinary();
     f->responder_done=xSemaphoreCreateBinary();f->client_read=xSemaphoreCreateBinary();
@@ -99,7 +99,7 @@ static void scenario(fixture *f,unsigned w,mode m){
     config.recv_wait_timeout=2;config.send_wait_timeout=2;
     httpd_handle_t server=NULL;CHECK(httpd_start(&server,&config)==ESP_OK);
     CHECK(room_http_adopt(&f->life,server,httpd_stop));
-    CHECK(simple(f,MB_OPEN,false,false)==ACK_OK);CHECK(simple(f,MB_STARTED,true,false)==ACK_OK);
+    CHECK(gate_open(&f->box,w,read_clock,NULL));
     room_lease owner_lease={0};CHECK(room_http_enter(&f->life,w,&owner_lease));
     httpd_uri_t uri={.uri="/probe",.method=HTTP_POST,.handler=uri_handler,.user_ctx=f};
     CHECK(httpd_register_uri_handler(server,&uri)==ESP_OK);
@@ -115,15 +115,15 @@ static void scenario(fixture *f,unsigned w,mode m){
     CHECK(poll_receipt(f,&out)==ACK_WAIT&&out.ticket==0);
     uint8_t extra=1;CHECK(event(f,(mb_event){.action=MB_SUBMIT,.input=&extra,.size=1},false,&out)==ACK_REJECT);
     uint64_t deadline=now()+(m==LATE?300u:(m==CLOSE_PENDING?4500u:1500u));bool closing=m==CLOSE_PENDING||m==LATE;
-    if(closing){CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
-        CHECK(f->box.box.life.stop_deadline==deadline);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
+    if(closing){CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+        CHECK(f->box.inner.box.life.stop_deadline==deadline);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
         CHECK(!room_admission_drained(&f->life.gate,w));CHECK(simple(f,MB_DRAINED,true,true)==ACK_REJECT);
         if(m==LATE){while(now()<deadline)vTaskDelay(1);CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_LOCKED);}}
     if(m==CLOSE_PENDING){
         while(now()+2200u<deadline)vTaskDelay(1);
-        CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+        CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
         CHECK(room_http_close(&f->life,w,deadline)==ROOM_SDK_WAIT);
-        CHECK(f->box.box.life.stop_deadline==deadline);
+        CHECK(f->box.inner.box.life.stop_deadline==deadline);
     }
     give(f->allow_complete);take(f->completed);
     CHECK(poll_receipt(f,&out)==(closing?ACK_REJECT:ACK_WAIT));
@@ -132,18 +132,47 @@ static void scenario(fixture *f,unsigned w,mode m){
     if(!closing){CHECK(poll_receipt(f,&out)==ACK_OK&&out.ticket==f->ticket);CHECK(poll_receipt(f,&out)==ACK_REJECT);}
     else CHECK(poll_receipt(f,&out)==ACK_REJECT);
     give(f->allow_client_close);take(f->client_done);
-    if(!closing)CHECK(ack_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);
+    if(!closing){CHECK(gate_close_until(&f->box,w,deadline,false,false,read_clock,NULL)==ACK_WAIT);}
     CHECK(room_admission_leave(&owner_lease));
     room_sdk_stop_result rc=room_http_close(&f->life,w,deadline);
     while(rc==ROOM_SDK_WAIT){CHECK(now()<deadline);vTaskDelay(1);rc=room_http_close(&f->life,w,deadline);}
     bool locked=m==LATE;CHECK(rc==(locked?ROOM_SDK_LOCKED:ROOM_SDK_DRAINED));CHECK(worker.quarantined==locked);
-    CHECK(ack_close_until(&f->box,w,deadline,!locked,!locked,read_clock,NULL)==(locked?ACK_REJECT:ACK_OK));
-    CHECK(ack_step(&f->box,(mb_event){.action=MB_OPEN,.window=w+100},false,&out,read_clock,NULL)==(locked?ACK_REJECT:ACK_OK));
+    CHECK(gate_close_until(&f->box,w,deadline,!locked,!locked,read_clock,NULL)==(locked?ACK_REJECT:ACK_OK));
+    CHECK(gate_open(&f->box,w+100,read_clock,NULL)==!locked);
+    if(!locked)CHECK(gate_close_until(&f->box,w+100,now()+1000u,true,true,read_clock,NULL)==ACK_OK);
     if(locked)CHECK(!room_http_prepare(&forbidden,&worker,w+1));
-    printf("HTTP_MB_BUDGET_CASE %u status=%u ack=%u result=%d\n",w,m==APP_ERROR?503u:200u,closing?0u:1u,(int)rc);fflush(stdout);
+    printf("HTTP_MB_GATE_CASE %u status=%u ack=%u result=%d\n",w,m==APP_ERROR?503u:200u,closing?0u:1u,(int)rc);fflush(stdout);
+}
+/* Deliberately blocked clock only in this isolated scheduling fixture.
+ * Production clock callbacks must remain bounded and nonblocking. */
+static stop_gate_adapter race_gate;
+static SemaphoreHandle_t race_entered,race_release,race_done;
+static ack_result race_result;
+static mb_reply race_reply;
+static bool race_clock(void *ctx,uint64_t *ms){(void)ctx;give(race_entered);take(race_release);return read_clock(NULL,ms);}
+static void race_traffic(void *ctx){
+    (void)ctx;uint8_t input[3]={1,2,3};
+    race_result=gate_step(&race_gate,(mb_event){.action=MB_SUBMIT,.window=1,.input=input,.size=sizeof input},false,&race_reply,race_clock,NULL);
+    give(race_done);vTaskDelete(NULL);
+}
+static void stop_race(void){
+    gate_init(&race_gate);CHECK(gate_open(&race_gate,1,read_clock,NULL));
+    race_entered=xSemaphoreCreateBinary();race_release=xSemaphoreCreateBinary();race_done=xSemaphoreCreateBinary();
+    CHECK(race_entered&&race_release&&race_done);
+    CHECK(xTaskCreate(race_traffic,"gate_race",4096,NULL,3,NULL)==pdPASS);take(race_entered);
+    uint64_t deadline=now()+3000u;mb_reply out;uint8_t b=1;
+    CHECK(gate_close_until(&race_gate,1,deadline,false,false,read_clock,NULL)==ACK_BUSY);
+    CHECK(gate_step(&race_gate,(mb_event){.action=MB_SUBMIT,.window=1,.input=&b,.size=1},false,&out,read_clock,NULL)==ACK_REJECT);
+    give(race_release);take(race_done);CHECK(race_result==ACK_REJECT&&!race_reply.ticket);
+    CHECK(gate_close_until(&race_gate,1,deadline,true,false,read_clock,NULL)==ACK_WAIT);
+    CHECK(gate_close_until(&race_gate,1,deadline,true,true,read_clock,NULL)==ACK_OK);
+    CHECK(gate_open(&race_gate,2,read_clock,NULL));
+    CHECK(gate_close_until(&race_gate,2,now()+1000u,true,true,read_clock,NULL)==ACK_OK);
+    puts("HTTP_MB_GATE_RACE_PASS");fflush(stdout);
 }
 void app_main(void){
     CHECK(esp_netif_init()==ESP_OK);CHECK(esp_event_loop_create_default()==ESP_OK);CHECK(room_sdk_stop_bind(&worker));
+    stop_race();
     for(unsigned i=0;i<4;i++)scenario(&cases[i],i+1,(mode)i);
-    puts("HTTP_MB_BUDGET_PASS");fflush(stdout);
+    puts("HTTP_MB_GATE_PASS");fflush(stdout);
 }
