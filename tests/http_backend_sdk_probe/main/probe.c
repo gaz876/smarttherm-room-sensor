@@ -39,9 +39,14 @@ static bool observe(void *ctx,const esp_netif_t *p,const httpd_req_t *req,room_h
     CHECK(ctx==&ap_marker&&p==fake_ap()&&req&&o);
     int fd=httpd_req_to_sockfd((httpd_req_t *)req);
     struct sockaddr_in local={0},remote={0};socklen_t a=sizeof(local),b=sizeof(remote);
-    if(fd<0||getsockname(fd,(struct sockaddr *)&local,&a)!=0||getpeername(fd,(struct sockaddr *)&remote,&b)!=0)return false;
+    if(fd<0||getsockname(fd,(struct sockaddr *)&local,&a)!=0||getpeername(fd,(struct sockaddr *)&remote,&b)!=0){
+        printf("SDK_BACKEND_OBSERVE_FAIL socket errno=%d\n",errno);fflush(stdout);return false;
+    }
     if(a!=sizeof(local)||b!=sizeof(remote)||local.sin_family!=AF_INET||remote.sin_family!=AF_INET||
-       local.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)||remote.sin_addr.s_addr!=htonl(INADDR_LOOPBACK))return false;
+       local.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)||remote.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)){
+        printf("SDK_BACKEND_OBSERVE_FAIL family=%d/%d length=%u/%u\n",(int)local.sin_family,(int)remote.sin_family,(unsigned)a,(unsigned)b);
+        fflush(stdout);return false;
+    }
     /* Fixed test-local identity only. This does NOT qualify real AP evidence. */
     *o=(room_http_peer_observation){true,true,true,1,42};
     return true;
